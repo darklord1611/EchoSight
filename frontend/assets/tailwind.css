@@ -1,0 +1,25 @@
+@import url("https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css");
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.pages-wrapper {
+  @apply p-4 pt-20 md:px-8 md:pt-28 xl:px-12 xl:pt-32 min-h-screen;
+}
+
+.selecting-button {
+  @apply btn btn-outline btn-lg h-20 w-20;
+}
+
+.selected-button {
+  @apply btn btn-primary btn-lg h-20 w-20;
+}
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}

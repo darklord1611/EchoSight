@@ -1,0 +1,8 @@
+fpdf==1.7.2
+openai==1.70.0
+imread-from-url==0.1.3
+pyzbar==0.1.9
+deepface==0.0.93
+tf-keras==2.19.0
+google-generativeai==0.8.4
+pymongo==4.11.3

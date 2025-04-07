@@ -1,0 +1,22 @@
+<resources>
+    <string name="app_name">frontend-kotlin</string>
+    <string name="menu">Bảng chọn</string>
+    <string name="question_mark">Câu hỏi</string>
+
+    <string name="text">Đọc Tài liệu</string>
+    <string name="money">Xác định Tiền tệ</string>
+    <string name="item">Chú thích hình ảnh</string>
+    <string name="distance">Định vị vật thể</string>
+    <string name="product">Nhận diện Sản phẩm thông qua mã vạch</string>
+    <string name="face">Nhận diện Khuôn mặt</string>
+    
+    <string name="screenshot">Chụp ảnh</string>
+    <string name="return_to_menu">Trở về</string>
+    <string name="add_face">Đăng ký khuôn mặt</string>
+    <string name="DoB">Ngày sinh</string>
+    <string name="Relationship">Tình trạng hôn nhân</string>
+    <string name="hometown">Quê quán</string>
+    <string name="name">Họ và tên</string>
+    <string name="confirm">Xác nhận</string>
+    <string name="switch_camera">Chuyển camera</string>
+</resources>
