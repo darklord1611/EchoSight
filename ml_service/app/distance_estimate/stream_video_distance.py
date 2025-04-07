@@ -7,7 +7,7 @@ from .yolov8.utils import class_names
 model_path = './models/yolov8m.onnx'
 yolov8_detector = YOLOv8(model_path, conf_thres=0.2, iou_thres=0.3)
 
-image_path = "dis.jpg"  
+image_path = "./app/distance_estimate/dis.jpg"  
 KNOWN_DISTANCE = 24.0 
 KNOWN_WIDTH = 11.0   
 

@@ -7,7 +7,7 @@ import numpy as np
 import openai
 from pydantic import Json
 from sympy import content
-from .utils.formatter import create_pdf, create_pdf_async
+from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
 from .config import config
 from .text_recognition.provider.ocr.ocr import OcrRecognition
@@ -143,7 +143,7 @@ async def product_recognition(file: UploadFile = File(...)):
         print(e)
         raise HTTPException(status_code=500, detail="Internal server error")
 
-image_path = "dis.jpg"  
+image_path = "./app/dis.jpg"  
 
 calculate_focal_length_stream(image_path)
 
