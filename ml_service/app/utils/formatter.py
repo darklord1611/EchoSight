@@ -25,7 +25,7 @@ def segment_text_by_sentence(text):
 def create_pdf(text: str, output_path: str):
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font("FreeSerif",fname="FreeSerif.ttf", uni=True)
+    pdf.add_font("FreeSerif",fname="./app/FreeSerif.ttf", uni=True)
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("FreeSerif", size=12)
     pdf.multi_cell(0, 10, text)

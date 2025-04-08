@@ -7,7 +7,7 @@ import numpy as np
 import openai
 from pydantic import Json
 from sympy import content
-from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai
+from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai, format_product_information_with_openai
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
 from .config import config
 from .text_recognition.provider.ocr.ocr import OcrRecognition
