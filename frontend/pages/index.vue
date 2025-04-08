@@ -11,7 +11,7 @@
                 </button>
             </div>
             <div class="flex-1">
-                <a class="btn btn-ghost text-xl">Vision Mate</a>
+                <a class="btn btn-ghost text-xl">EchoSight</a>
             </div>
             <div class="flex-none">
                 <button class="btn btn-square btn-ghost" onclick="about.showModal()">
@@ -21,7 +21,15 @@
         </div>
 
         <div class="flex-grow h-[70%]">
-            <Camera :resolution="cameraResolution" ref="camera" autoplay class="w-full h-full"></Camera>
+            <div class="w-full h-full">
+                <Camera :resolution="cameraResolution" ref="camera" autoplay />
+            </div>
+            <!-- <Camera :resolution="cameraResolution" ref="camera" autoplay class="w-full h-full"></Camera> -->
+        </div>
+        <div class="flex justify-center mt-4">
+            <button class="btn btn-primary" @click="snapshot">
+                Take Snapshot
+            </button>
         </div>
 
         <div class="h-[20%] md:m-auto">
@@ -54,11 +62,14 @@
 
 <script setup lang="ts">
 import Camera from 'simple-vue-camera';
+import { v4 as uuidv4 } from 'uuid';
 
 const camera = ref<InstanceType<typeof Camera>>();
 const snapshotUrl = ref<string | null>(null);
 const selectedButtonName = ref<string>('Text');
 const cameraResolution = ref<{ width: number, height: number }>({ width: 375, height: 600 });
+const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+
 
 interface JsonResponse {
     audio_path?: string;
@@ -67,6 +78,7 @@ interface JsonResponse {
 
 const jsonResponse = ref<JsonResponse | null>(null);
 const audioUrl = ref<string | null>(null);
+const snapshots = ref<{ id: string, filename: string, timestamp: string }[]>([]);
 
 const endpoints: Record<string, string> = {
     'Text': '/document_recognition',
@@ -78,6 +90,7 @@ const endpoints: Record<string, string> = {
 };
 
 const snapshot = async () => {
+    console.log('Taking snapshot...');
     const blob = await camera.value?.snapshot();
     if (blob) {
         snapshotUrl.value = URL.createObjectURL(blob);
@@ -89,11 +102,19 @@ const sendImageToEndpoint = async (blob: Blob) => {
     const endpoint = endpoints[selectedButtonName.value];
     if (!endpoint) return;
 
+    const fullUrl = `${BACKEND_URL}${endpoint}`;
+
+    const id = uuidv4(); // Unique ID for this snapshot
+    const timestamp = new Date().toISOString();
+    const filename = `snapshot-${id}.jpg`;
+
+    const file = new File([blob], filename, { type: "image/jpeg" });
+
     const formData = new FormData();
-    formData.append('file', blob);
+    formData.append('file', file);
 
     try {
-        const response = await fetch(endpoint, {
+        const response = await fetch(fullUrl, {
             method: 'POST',
             body: formData,
             headers: {
@@ -111,7 +132,7 @@ const sendImageToEndpoint = async (blob: Blob) => {
         const audioPath = jsonResponse.value?.audio_path;
         if (audioPath) {
             const encodedAudioPath = encodeURIComponent(audioPath);
-            const audioFileUrl = `/download_audio?audio_path=${encodedAudioPath}`;
+            const audioFileUrl = `${BACKEND_URL}/download_audio?audio_path=${encodedAudioPath}`;
             console.log('Audio File URL:', audioFileUrl);
             audioUrl.value = audioFileUrl;
         }
@@ -143,7 +164,7 @@ let intervalId: ReturnType<typeof setInterval> | undefined;
 onMounted(() => {
     updateCameraResolution();
     window.addEventListener('resize', updateCameraResolution);
-    intervalId = setInterval(snapshot, 5000);
+    // intervalId = setInterval(snapshot, 60000);
 });
 
 onUnmounted(() => {
