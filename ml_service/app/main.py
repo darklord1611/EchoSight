@@ -7,7 +7,7 @@ import numpy as np
 import openai
 from pydantic import Json
 from sympy import content
-from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai, format_product_information_with_openai
+from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai, format_response_product_recognition_with_openai, format_audio_response
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
 from .config import config
 from .text_recognition.provider.ocr.ocr import OcrRecognition
@@ -64,10 +64,16 @@ async def document_recognition(file: UploadFile = File(...)):
         asyncio.gather(
             create_pdf_async(result, pdf_path)
         )
-        return JSONResponse(content={
-            "text": result,
-            "pdf_path": pdf_path
-        })
+
+        audio_file_path = format_audio_response(result, "text_recognition")
+        if audio_file_path:
+            return JSONResponse(content={
+                "text": result,
+                "pdf_path": pdf_path,
+                "audio_path": audio_file_path,
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio response")
 
     except Exception as e:
         print(f"Lỗi xảy ra: {e}")
@@ -83,9 +89,15 @@ async def currency_detection(file: UploadFile = File(...)):
             img = cv2.imread(temp.name)
             currency_detector(img)
             total_money = currency_detector.get_total_money()
-            return JSONResponse(content={
-                "total_money": total_money,
-            })
+
+            audio_path = format_audio_response(total_money, "currency_detection")
+            if audio_path:
+                return JSONResponse(content={
+                    "total_money": total_money,
+                    "audio_path": audio_path,
+                })
+            else:
+                raise HTTPException(status_code=500, detail="Failed to generate audio response")
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -113,9 +125,14 @@ async def image_captioning(file: UploadFile = File(...)):
         if not description:
             raise HTTPException(status_code=500, detail="Failed to generate image description")
 
-        return JSONResponse(content={
-            "description": description,
-        })
+        audio_path = format_audio_response(description, "image_captioning")
+        if audio_path:
+            return JSONResponse(content={
+                "description": description,
+                "audio_path": audio_path,
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio response")
 
     except Exception as e:
         print(e)
@@ -134,11 +151,17 @@ async def product_recognition(file: UploadFile = File(...)):
                 raise HTTPException(status_code=400, detail="Invalid image file")
             result = barcode_processor.process_image(img)
             print(result)
-            description = format_product_information_with_openai(result)
+            description = format_response_product_recognition_with_openai(result)
             print(description)
-            return JSONResponse(content= {
-                "description": description
-            })
+
+            audio_path = format_audio_response(description, "product_recognition")
+            if audio_path:
+                return JSONResponse(content={
+                    "description": description,
+                    "audio_path": audio_path,
+                })
+            else:
+                raise HTTPException(status_code=500, detail="Failed to generate audio response")
     except Exception as e:
         print(e)
         raise HTTPException(status_code=500, detail="Internal server error")
@@ -206,7 +229,7 @@ async def register(
         }))
         
         return JSONResponse(content= {
-            "description": f"Đã đăng kí thành công nhận diện khuôn mặt đối với {name} với thông tin như sau: Quê quán: {hometown}, Mối quan hệ với ngư��i dùng {relationship}, ngày tháng năm sinh: {date_of_birth}"
+            "description": f"Đã đăng kí thành công nhận diện khuôn mặt đối với {name} với thông tin như sau: Quê quán: {hometown}, Mối quan hệ với người dùng {relationship}, ngày tháng năm sinh: {date_of_birth}"
         })
         
     except Exception as e:

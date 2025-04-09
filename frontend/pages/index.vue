@@ -135,6 +135,12 @@ const sendImageToEndpoint = async (blob: Blob) => {
             const audioFileUrl = `${BACKEND_URL}/download_audio?audio_path=${encodedAudioPath}`;
             console.log('Audio File URL:', audioFileUrl);
             audioUrl.value = audioFileUrl;
+
+            // Play audio immediately
+            const audio = new Audio(audioFileUrl);
+            audio.play().catch(err => {
+                console.error("Audio playback failed:", err);
+            });
         }
     } catch (error) {
         console.error('Error sending image to endpoint:', error);
