@@ -1,5 +1,6 @@
 from ast import List
 import re
+from tempfile import NamedTemporaryFile
 import openai
 from openai import OpenAI
 import os
@@ -7,6 +8,7 @@ import logging
 from fpdf import FPDF
 import asyncio
 from ..config import config
+from gtts import gTTS
 
 def segment_text_by_sentence(text):
     sentence_boundaries = re.finditer(r'(?<=[.!?])\s+', text)
@@ -107,7 +109,7 @@ def format_response_distance_estimate_with_openai(response, transcribe, base64_i
         return str(response)
     
 
-def format_product_information_with_openai(response):
+def format_response_product_recognition_with_openai(response):
     try:
         if not config.OPENAI_API_KEY:
             logging.error("OpenAI API key is missing")
@@ -158,3 +160,44 @@ def format_product_information_with_openai(response):
     except Exception as e:
         logging.error(f"Unexpected error in product information processing: {e}")
         return str(response)
+
+def format_response_music_detection_with_openai(response):
+    pass
+
+def format_response_general_question_answering_with_openai(response):
+    pass
+
+
+def format_audio_response(response, task):
+    match(task):
+        case "distance_estimate":
+            pass
+        case "product_recognition":
+            product_text = f"Product: {response['name']}, Brand: {response['brand']}, Quantity: {response['quantity']}."
+            nutrition_text = " ".join(
+                [f"{nutrient.replace('_', ' ')}: {amount}" for nutrient, amount in response['nutrition'].items()]
+            )
+            full_text = f"{product_text} Nutrition Information: {nutrition_text}"
+        case "currency_detection":
+            full_text = f"Tổng số tiền là {response['total_amount']} đồng"
+        case "text_recognition":
+            full_text = response
+        case "image_captioning":
+            full_text = response
+        case "music_recognition":
+            pass
+        case "article_reading":
+            pass
+        case "general_question_answering":
+            pass        
+
+    try:
+        # Generate voice output using gTTS
+        audio_file = NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts = gTTS(full_text, lang="vi")
+        tts.save(audio_file.name)
+        
+        return audio_file.name
+    except Exception as e:
+        logging.error(f"Error generating audio response: {e}")
+        return None
