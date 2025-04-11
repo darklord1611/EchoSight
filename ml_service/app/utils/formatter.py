@@ -161,6 +161,12 @@ def format_response_product_recognition_with_openai(response):
         logging.error(f"Unexpected error in product information processing: {e}")
         return str(response)
 
+def format_response_music_detection_with_openai(response):
+    pass
+
+def format_response_general_question_answering_with_openai(response):
+    pass
+
 
 def format_audio_response(response, task):
     match(task):

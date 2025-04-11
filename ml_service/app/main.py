@@ -296,6 +296,45 @@ async def recognize(file: UploadFile = File(...)):
         raise HTTPException(status_code=404, detail="Failed to process recognition")
 
 
+@app.post("music_detection")
+async def music_detection(file: UploadFile = File(...)):
+    try:
+        with NamedTemporaryFile(delete=False) as temp:
+            temp.write(file.file.read())
+            temp_path = temp.name
+
+        audio_path = format_audio_response(temp_path, "music_recognition")
+        if audio_path:
+            return JSONResponse(content={
+                "audio_path": audio_path,
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+
+@app.post("/general_question_answering")
+async def general_question_answering(file: UploadFile = File(...)):
+    try:
+        with NamedTemporaryFile(delete=False) as temp:
+            temp.write(file.file.read())
+            temp_path = temp.name
+
+        audio_path = format_audio_response(temp_path, "general_question_answering")
+        if audio_path:
+            return JSONResponse(content={
+                "audio_path": audio_path,
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
 
 @app.get("/download_pdf")
 async def download_pdf(pdf_path: str):

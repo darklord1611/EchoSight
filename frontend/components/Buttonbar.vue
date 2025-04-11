@@ -30,6 +30,9 @@ const buttons = [
     { name: 'Product', icon: 'fa-solid fa-shopping-cart' },
     { name: 'Distance', icon: 'fa-solid fa-ruler' },
     { name: 'Face', icon: 'fa-solid fa-smile' },
+    { name: 'Music', icon: 'fa-solid fa-music' },
+    { name: 'Chatbot', icon: 'fa-solid fa-comments' },
+    { name: 'Article', icon: 'fa-solid fa-newspaper' },
 ];
 
 const selectButton = (index: number) => {
