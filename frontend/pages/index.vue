@@ -1,71 +1,84 @@
 <template>
-    <div class="flex flex-col h-screen">
-        <div class="navbar bg-base-100 h-[10%]">
-            <div class="flex-none">
-                <button class="btn btn-square btn-ghost" onclick="settings.showModal()">
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
-                        class="inline-block h-5 w-5 stroke-current">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16">
-                        </path>
-                    </svg>
-                </button>
-            </div>
-            <div class="flex-1">
-                <a class="btn btn-ghost text-xl">EchoSight</a>
-            </div>
-            <div class="flex-none">
-                <button class="btn btn-square btn-ghost" onclick="about.showModal()">
-                    <i class="fa-regular fa-circle-question text-xl"></i>
-                </button>
-            </div>
-        </div>
-
-        <div class="flex-grow h-[70%]">
-            <div class="w-full h-full">
-                <Camera :resolution="cameraResolution" ref="camera" autoplay />
-            </div>
-            <!-- <Camera :resolution="cameraResolution" ref="camera" autoplay class="w-full h-full"></Camera> -->
-        </div>
-        <div class="flex justify-center mt-4">
-            <button class="btn btn-primary" @click="snapshot">
-                Take Snapshot
-            </button>
-        </div>
-
-        <div class="h-[20%] md:m-auto">
-            <Buttonbar :defaultSelected="selectedButtonName" @update:selectedButton="updateSelectedButton" class="w-full h-full" />
-        </div>
-
-        <audio v-if="audioUrl" :src="audioUrl" autoplay style="display: none;"></audio>
-
-        <SpotifyMiniPlayer
-            v-if="currentTrack"
-            :track="currentTrack"
-            :isPlaying="isPlaying"
-            :togglePlayback="togglePlayback"
-        />
-
-        <dialog id="settings" class="modal">
-            <div class="modal-box">
-                <h3 class="text-lg font-bold">Taluli talula!</h3>
-                <p class="py-4">Taluli talula!</p>
-            </div>
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
-
-        <dialog id="about" class="modal">
-            <div class="modal-box">
-                <h3 class="text-lg font-bold">Taluli talula!</h3>
-                <p class="py-4">Taluli talula!</p>
-            </div>
-            <form method="dialog" class="modal-backdrop">
-                <button>close</button>
-            </form>
-        </dialog>
+  <div class="flex flex-col h-screen">
+    <!-- Top Navbar -->
+    <div class="navbar bg-base-100 h-[10%]">
+      <div class="flex-none">
+        <button class="btn btn-square btn-ghost" onclick="settings.showModal()">
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"
+            class="inline-block h-5 w-5 stroke-current">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+          </svg>
+        </button>
+      </div>
+      <div class="flex-1">
+        <a class="btn btn-ghost text-xl">EchoSight</a>
+      </div>
+      <div class="flex-none">
+        <button class="btn btn-square btn-ghost" onclick="about.showModal()">
+          <i class="fa-regular fa-circle-question text-xl"></i>
+        </button>
+      </div>
     </div>
+
+    <!-- Main Content: Vertical Button Bar + Camera -->
+    <div class="flex flex-grow">
+      <!-- Vertical Button Bar -->
+      <div class="bg-base-200 p-2 flex flex-col space-y-2 min-w-[100px]">
+        <Buttonbar :defaultSelected="selectedButtonName" @update:selectedButton="updateSelectedButton" />
+      </div>
+
+      <!-- Camera Area (Smaller & Centered) -->
+      <div class="flex flex-1 justify-center items-center">
+        <div class="flex flex-col items-center">
+          <div class="w-[320px] h-[240px] rounded overflow-hidden shadow-lg">
+            <Camera :resolution="cameraResolution" ref="camera" autoplay class="w-full h-full" />
+          </div>
+          <div class="mt-4">
+            <button class="btn btn-primary" @click="snapshot">
+              Take Snapshot
+            </button>
+          </div>
+          <div class="mt-4">
+            <VoiceCommand @featureMatched="updateSelectedButton" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+
+    <!-- Audio & Spotify Player -->
+    <audio v-if="audioUrl" :src="audioUrl" autoplay style="display: none;"></audio>
+
+    <SpotifyMiniPlayer
+      v-if="currentTrack"
+      :track="currentTrack"
+      :isPlaying="isPlaying"
+      :togglePlayback="togglePlayback"
+    />
+
+    <!-- Modals -->
+    <dialog id="settings" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">Taluli talula!</h3>
+        <p class="py-4">Taluli talula!</p>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>Close</button>
+      </form>
+    </dialog>
+
+    <dialog id="about" class="modal">
+      <div class="modal-box">
+        <h3 class="text-lg font-bold">Taluli talula!</h3>
+        <p class="py-4">Taluli talula!</p>
+      </div>
+      <form method="dialog" class="modal-backdrop">
+        <button>Close</button>
+      </form>
+    </dialog>
+  </div>
 </template>
+
 
 <script setup lang="ts">
 
@@ -91,6 +104,18 @@ interface JsonResponse {
 const jsonResponse = ref<JsonResponse | null>(null);
 const audioUrl = ref<string | null>(null);
 const snapshots = ref<{ id: string, filename: string, timestamp: string }[]>([]);
+
+const buttons = [
+  { name: 'Text', icon: 'fa-solid fa-quote-right' },
+  { name: 'Currency', icon: 'fa-solid fa-dollar-sign' },
+  { name: 'Object', icon: 'fa-solid fa-cube' },
+  { name: 'Product', icon: 'fa-solid fa-shopping-cart' },
+  { name: 'Distance', icon: 'fa-solid fa-ruler' },
+  { name: 'Face', icon: 'fa-solid fa-smile' },
+  { name: 'Music', icon: 'fa-solid fa-music' },
+  { name: 'Chatbot', icon: 'fa-solid fa-comments' },
+  { name: 'Article', icon: 'fa-solid fa-newspaper' },
+];
 
 import { useSpotifySDK } from '@/composables/useSpotifySDK';
 
@@ -351,9 +376,10 @@ const playButtonText = (text: string) => {
     speechSynthesis.speak(utterance);
 };
 
+
 const updateSelectedButton = (buttonName: string) => {
     selectedButtonName.value = buttonName;
-    playButtonText(buttonName); 
+    console.log(`Selected button: ${buttonName}`);
 };
 
 const updateCameraResolution = () => {

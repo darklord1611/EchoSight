@@ -7,6 +7,10 @@ import numpy as np
 import openai
 from pydantic import Json
 from sympy import content
+
+from app.article_reading.pipeline import execute_pipeline
+from app.question_answering.pipeline import ask_general_question
+from app.utils.deepgram import transcribe_audio
 from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai, format_response_product_recognition_with_openai, format_audio_response
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
 from .config import config
@@ -25,6 +29,14 @@ from .face_detection.detectMongo import find_existing_face, process_frame, save_
 import json
 import mimetypes
 from .image_captioning.provider.gpt4.gpt4 import OpenAIProvider
+from fastapi import FastAPI, UploadFile, File
+from sentence_transformers import SentenceTransformer, util
+from dotenv import load_dotenv
+import os
+import tempfile
+import requests
+
+
 start = time.time()
 ocr = OcrRecognition()
 currency_detection_model_path = "./models/best8.onnx"
@@ -316,16 +328,108 @@ async def music_detection(file: UploadFile = File(...)):
         raise HTTPException(status_code=500, detail="Internal server error")
 
 
-@app.post("/general_question_answering")
-async def general_question_answering(file: UploadFile = File(...)):
-    try:
-        with NamedTemporaryFile(delete=False) as temp:
-            temp.write(file.file.read())
-            temp_path = temp.name
 
-        audio_path = format_audio_response(temp_path, "general_question_answering")
+
+embedder = SentenceTransformer('all-MiniLM-L6-v2')
+
+FEATURE_LABELS = {
+    "Text": ["read", "text", "document", "page"],
+    "Currency": ["money", "bill", "coin", "cash"],
+    "Object": ["object", "describe", "thing", "what is this"],
+    "Product": ["product", "brand", "logo", "item"],
+    "Distance": ["distance", "range", "how far"],
+    "Face": ["face", "who is this", "person"],
+    "Music": ["song", "music", "track", "what's playing"],
+    "Article": ["news", "article", "read", "summary"],
+    "Chatbot": ["chat", "talk", "conversation", "ask"],
+}
+
+
+@app.post("/transcribe_audio")
+async def voice_command(file: UploadFile = File(...)):
+    # Save uploaded audio to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+
+        transcript = transcribe_audio(tmp_path)
+
+        # Find most similar feature
+        transcript_embed = embedder.encode(transcript["transcript"], convert_to_tensor=True)
+        best_match, best_score = None, -1
+
+        for label, phrases in FEATURE_LABELS.items():
+            for phrase in phrases:
+                phrase_embed = embedder.encode(phrase, convert_to_tensor=True)
+                score = util.cos_sim(transcript_embed, phrase_embed).item()
+                if score > best_score:
+                    best_match, best_score = label, score
+
+        return {
+            "transcript": transcript,
+            "command": best_match,
+            "confidence": best_score
+        }
+    except Exception as e:
+        print("❌ Error:", e)
+        return {"error": "Failed to process audio."}
+
+
+@app.post("/article_reading")
+async def article_reading(file: UploadFile = File(...)):
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        news_query = transcribe_audio(tmp_path)        
+
+        # process audio to extract the news query
+        if "error" in news_query:
+            raise HTTPException(status_code=400, detail="Failed to transcribe audio")
+        
+        summary = execute_pipeline(news_query["transcript"])
+
+        audio_path = format_audio_response(summary, "article_reading")
         if audio_path:
             return JSONResponse(content={
+                "summary": summary,
+                "audio_path": audio_path,
+            })
+        else:
+            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+    except Exception as e:
+        print(e)
+        raise HTTPException(status_code=500, detail="Internal server error")
+
+@app.post("/general_question_answering")
+async def general_qa(file: UploadFile = File(...)):
+    # Step 1: Save uploaded audio to a temporary file
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
+
+    try:
+        # Step 2: Transcribe audio to text
+        transcript_result = transcribe_audio(tmp_path)
+
+        if "error" in transcript_result:
+            raise HTTPException(status_code=400, detail="Failed to transcribe audio")
+
+        question = transcript_result["transcript"]
+
+        # Step 3: Ask the LLM to answer the question
+        answer = ask_general_question(question)
+
+        # Step 4: Convert answer back to speech
+        audio_path = format_audio_response(answer, "general_question_answering")
+
+        if audio_path:
+            return JSONResponse(content={
+                "question": question,
+                "answer": answer,
                 "audio_path": audio_path,
             })
         else:
@@ -344,7 +448,6 @@ async def download_pdf(pdf_path: str):
 @app.get("/download_audio")
 async def download_audio(audio_path: str):
     return FileResponse(audio_path, media_type="audio/mpeg", filename="document.mp3")
-
 
 
 if __name__ == "__main__":
