@@ -23,11 +23,10 @@ def segment_text_by_sentence(text):
 
     return segments
 
-
 def create_pdf(text: str, output_path: str):
     pdf = FPDF()
     pdf.add_page()
-    pdf.add_font("FreeSerif",fname="./app/FreeSerif.ttf", uni=True)
+    pdf.add_font("FreeSerif", fname="./app/FreeSerif.ttf", uni=True)
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.set_font("FreeSerif", size=12)
     pdf.multi_cell(0, 10, text)
@@ -36,11 +35,10 @@ def create_pdf(text: str, output_path: str):
 async def create_pdf_async(text: str, pdf_path: str):
     await asyncio.to_thread(create_pdf, text, pdf_path)
     
-
 def format_response_distance_estimate_with_openai(response, transcribe, base64_image):
     try:
         if response is None or len(response) == 0:
-            return "Hiện tại không có vật thể nào được phát hiện"
+            return "No objects detected at the moment."
             
         if not config.OPENAI_API_KEY:
             logging.error("OpenAI API key is missing")
@@ -52,20 +50,20 @@ def format_response_distance_estimate_with_openai(response, transcribe, base64_i
         client = OpenAI()
 
         system_prompt = """
-            Bạn là một chuyên gia trong việc hướng dẫn người khiếm thị di chuyển an toàn và lấy đồ vật. Nhiệm vụ của bạn là chuyển đổi dữ liệu phát hiện đối tượng thành hướng dẫn di chuyển chi tiết, rõ ràng và an toàn bằng tiếng Việt. Bao gồm các yếu tố sau:
+            You are an expert in guiding visually impaired individuals to move safely and retrieve objects. Your task is to convert object detection data into clear, detailed, and safe movement instructions in English. Include the following:
 
-            - Xác định và mô tả vị trí của đồ vật được yêu cầu.
-            - Cung cấp hướng dẫn từng bước rõ ràng về cách tiếp cận đồ vật.
-            - Nêu bật bất kỳ mối nguy hiểm hoặc chướng ngại vật nào trên đường đi và đề xuất cách tránh chúng.
-            - Sử dụng ngôn ngữ chính xác để mô tả hướng đi (ví dụ: trái, phải, tiến, lùi) và khoảng cách.
-            - Đảm bảo hướng dẫn dễ hiểu và ưu tiên sự an toàn.
+            - Identify and describe the location of the requested object.
+            - Provide clear step-by-step instructions on how to reach the object.
+            - Highlight any potential hazards or obstacles and suggest how to avoid them.
+            - Use precise directional language (e.g., left, right, forward, backward) and distances.
+            - Ensure the instructions are easy to understand and prioritize safety.
 
-            Định dạng ví dụ:
-            "Để đến [đồ vật], hãy làm theo các bước sau:
-            1. Tiến về phía trước khoảng [khoảng cách] inch.
-            2. Rẽ [hướng] và tiếp tục đi [khoảng cách] inch.
-            3. Cẩn thận với [mối nguy hiểm] nằm ở [vị trí].
-            4. [Đồ vật] nằm ở [vị trí cuối cùng]."
+            Example format:
+            "To reach the [object], follow these steps:
+            1. Move forward approximately [distance] inches.
+            2. Turn [direction] and continue for [distance] inches.
+            3. Watch out for [hazard] located at [location].
+            4. The [object] is located at [final position]."
         """
 
         completion = client.chat.completions.create(
@@ -102,13 +100,12 @@ def format_response_distance_estimate_with_openai(response, transcribe, base64_i
 
     except openai.OpenAIError as openai_error:
         logging.error(f"OpenAI API Error: {openai_error}")
-        return f"Lỗi xử lý: {str(openai_error)}"
+        return f"Processing error: {str(openai_error)}"
 
     except Exception as e:
         logging.error(f"Unexpected error in distance estimation: {e}")
         return str(response)
     
-
 def format_response_product_recognition_with_openai(response):
     try:
         if not config.OPENAI_API_KEY:
@@ -118,24 +115,24 @@ def format_response_product_recognition_with_openai(response):
         client = OpenAI()
 
         system_prompt = """
-        Nhiệm vụ của bạn là chuyển đổi thông tin sản phẩm thành một đoạn văn mô tả chi tiết, dễ hiểu và hấp dẫn bằng tiếng Việt.
+        Your task is to convert product information into a detailed, easy-to-understand, and engaging paragraph in English.
 
-        Yêu cầu chi tiết:
-        - Cung cấp mô tả đầy đủ về sản phẩm
-        - Giải thích các thông số dinh dưỡng một cách dễ hiểu
-        - Đánh giá giá trị dinh dưỡng và tiềm năng sử dụng
-        - Sử dụng ngôn ngữ thân thiện, chuyên nghiệp
+        Requirements:
+        - Provide a full description of the product.
+        - Explain nutritional information in a simple way.
+        - Evaluate the nutritional value and potential use.
+        - Use a friendly, professional tone.
 
-        Định dạng mẫu:
-        "[Tên sản phẩm] của thương hiệu [Tên thương hiệu] - Một trải nghiệm ẩm thực độc đáo!
+        Example format:
+        "[Product Name] by [Brand Name] – A unique culinary experience!
 
-        Chi tiết sản phẩm:
-        - Loại sản phẩm: [Mô tả chi tiết]
-        - Khối lượng: [Khối lượng]
-        - Danh mục: [Các danh mục phù hợp]
+        Product Details:
+        - Type: [Detailed description]
+        - Weight: [Weight]
+        - Category: [Relevant categories]
 
-        Giá trị dinh dưỡng (Phân tích chuyên sâu):
-        [Phân tích chi tiết về năng lượng, chất béo, carbohydrate, đạm]
+        Nutritional Value (In-depth analysis):
+        [Detailed breakdown of energy, fat, carbohydrates, and protein]"
         """
 
         completion = client.chat.completions.create(
@@ -155,7 +152,7 @@ def format_response_product_recognition_with_openai(response):
 
     except openai.OpenAIError as openai_error:
         logging.error(f"OpenAI API Error: {openai_error}")
-        return f"Lỗi xử lý thông tin sản phẩm: {str(openai_error)}"
+        return f"Error processing product information: {str(openai_error)}"
 
     except Exception as e:
         logging.error(f"Unexpected error in product information processing: {e}")
@@ -167,36 +164,52 @@ def format_response_music_detection_with_openai(response):
 def format_response_general_question_answering_with_openai(response):
     pass
 
-
 def format_audio_response(response, task):
     match(task):
         case "distance_estimate":
-            pass
+            full_text = f"The estimated distance to the object is approximately {response} meters."
+
         case "product_recognition":
             product_text = f"Product: {response['name']}, Brand: {response['brand']}, Quantity: {response['quantity']}."
             nutrition_text = " ".join(
                 [f"{nutrient.replace('_', ' ')}: {amount}" for nutrient, amount in response['nutrition'].items()]
             )
             full_text = f"{product_text} Nutrition Information: {nutrition_text}"
+
         case "currency_detection":
-            full_text = f"Tổng số tiền là {response['total_amount']} đồng"
+            full_text = f"The total amount detected is {response['total_amount']} Vietnamese Dong."
+
         case "text_recognition":
-            full_text = response
+            full_text = f"The text in the image says: {response}"
+
         case "image_captioning":
-            full_text = response
+            full_text = f"This image can be described as: {response}"
+
         case "music_recognition":
-            pass
+            full_text = (
+                f"You are listening to '{response['title']}' by {response['artist']}. "
+                f"It was released in {response.get('year', 'an unknown year')}."
+            )
+
         case "article_reading":
-            pass
+            full_text = (
+                "Here's the summary of the article you asked for: " + response
+            )
+
         case "general_question_answering":
-            pass        
+            full_text = (
+                "Here's the answer to your question: " + response
+            )
+
+        case _:
+            full_text = "I'm sorry, I couldn't determine the type of response to generate."
 
     try:
         # Generate voice output using gTTS
         audio_file = NamedTemporaryFile(delete=False, suffix=".mp3")
-        tts = gTTS(full_text, lang="vi")
+        tts = gTTS(full_text, lang="en")
         tts.save(audio_file.name)
-        
+
         return audio_file.name
     except Exception as e:
         logging.error(f"Error generating audio response: {e}")

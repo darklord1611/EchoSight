@@ -7,3 +7,7 @@ tf-keras==2.19.0
 google-generativeai==0.8.4
 pymongo==4.11.3
 gtts==2.5.4
+sentence_transformers==4.0.2
+newspaper==0.2.8
+lxml_html_clean==0.4.2
+pyttsx3==2.98
