@@ -35,6 +35,7 @@ from dotenv import load_dotenv
 import os
 import tempfile
 import requests
+from collections import OrderedDict
 
 
 start = time.time()
@@ -332,32 +333,99 @@ async def music_detection(file: UploadFile = File(...)):
 
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 
-FEATURE_LABELS = {
-    "Text": ["read", "text", "document", "page"],
-    "Currency": ["money", "bill", "coin", "cash"],
-    "Object": ["object", "describe", "thing", "what is this"],
-    "Product": ["product", "brand", "logo", "item"],
-    "Distance": ["distance", "range", "how far"],
-    "Face": ["face", "who is this", "person"],
-    "Music": ["song", "music", "track", "what's playing"],
-    "Article": ["news", "article", "read", "summary"],
-    "Chatbot": ["chat", "talk", "conversation", "ask"],
-}
+# Initial unordered feature labels (prioritizing more distinct features first)
+raw_feature_labels = OrderedDict({
+    "Text": [
+        "read", "text", "document", "page", "story", "paragraph", "article", "content", 
+        "read aloud", "narrate", "text to speech"
+    ],
+    "Currency": [
+        "money", "bill", "coin", "cash", "cost", "amount", "price", "total", "currency", 
+        "value", "convert currency", "exchange rate"
+    ],
+    "Object": [
+        "object", "describe", "thing", "what is this", "identify", "scan", "recognize", 
+        "find", "detection", "look for", "object recognition"
+    ],
+    "Product": [
+        "product", "brand", "logo", "item", "product name", "identify product", "check product", 
+        "product details", "product information"
+    ],
+    "Distance": [
+        "distance", "range", "how far", "measure", "long", "distance to", "how far is", 
+        "how much is the distance", "measure distance", "range of"
+    ],
+    "Face": [
+        "face", "who is this", "person", "identify person", "recognize face", "face recognition", 
+        "who is the person", "show me the face"
+    ],
+    "Music": [
+        "music", "track", "what's playing", "music track", "listen", "audio"
+    ],
+    "Article": [
+        "article", "news", "read article", "summary", "latest news", "news article", "current events", 
+        "headlines", "news report", "summary of article"
+    ],
+    "Chatbot": [
+        "chat", "talk", "conversation", "ask", "question", "chatbot", "ask a question", 
+        "speak to", "let's talk", "chat with", "conversation with assistant"
+    ],
+    "Play": [
+        "play", "begin", "launch", "initiate", "start playback", "begin function", 
+        "start process", "launch task", "begin operation"
+    ],
+    "Stop": [
+        "stop", "pause", "halt", "end", "pause function", "halt process", "cancel", 
+        "end task", "stop operation"
+    ],
+    "Detect": [
+        "detect", "scan surroundings", "recognize object", "detect object", "scan area", 
+        "identify items", "find object"
+    ],
+    "Help": [
+        "help", "assist", "guide", "support", "help me", "assist me", "I need help", 
+        "provide assistance", "help with", "assist in", "guide me"
+    ],
+})
+
+# Deduplicate keywords across features
+used_keywords = set()
+deduped_feature_labels = {}
+
+for feature, keywords in raw_feature_labels.items():
+    unique_keywords = []
+    for keyword in keywords:
+        lower_keyword = keyword.lower()
+        if lower_keyword not in used_keywords:
+            unique_keywords.append(keyword)
+            used_keywords.add(lower_keyword)
+    deduped_feature_labels[feature] = unique_keywords
+
+FEATURE_LABELS = deduped_feature_labels
 
 
 @app.post("/transcribe_audio")
 async def voice_command(file: UploadFile = File(...)):
-    # Save uploaded audio to a temporary file
     with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
 
     try:
+        transcript_result = transcribe_audio(tmp_path)
+        transcript_text = transcript_result.get("transcript", "").lower()
 
-        transcript = transcribe_audio(tmp_path)
+        # Step 1: Exact keyword match
+        for label, keywords in FEATURE_LABELS.items():
+            for keyword in keywords:
+                if keyword.lower() in transcript_text:
+                    return {
+                        "transcript": transcript_result,
+                        "command": label,
+                        "confidence": 1.0,  # exact match = high confidence
+                    }
 
-        # Find most similar feature
-        transcript_embed = embedder.encode(transcript["transcript"], convert_to_tensor=True)
+        # Step 2: Semantic similarity fallback
+        transcript_embed = embedder.encode(transcript_text, convert_to_tensor=True)
         best_match, best_score = None, -1
 
         for label, phrases in FEATURE_LABELS.items():
@@ -368,9 +436,9 @@ async def voice_command(file: UploadFile = File(...)):
                     best_match, best_score = label, score
 
         return {
-            "transcript": transcript,
+            "transcript": transcript_result,
             "command": best_match,
-            "confidence": best_score
+            "confidence": round(best_score, 3)
         }
     except Exception as e:
         print("❌ Error:", e)
