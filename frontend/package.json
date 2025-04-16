@@ -12,6 +12,7 @@
   "dependencies": {
     "@formkit/auto-animate": "^0.8.2",
     "@nuxtjs/tailwindcss": "^6.12.2",
+    "axios": "^1.8.4",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
     "node-fetch": "^3.3.2",

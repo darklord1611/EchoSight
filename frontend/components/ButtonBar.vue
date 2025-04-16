@@ -36,7 +36,7 @@ const buttons = [
   { name: 'Face', icon: 'fa-solid fa-smile' },
   { name: 'Music', icon: 'fa-solid fa-music' },
   { name: 'Chatbot', icon: 'fa-solid fa-comments' },
-  { name: 'Article', icon: 'fa-solid fa-newspaper' },
+  { name: 'News', icon: 'fa-solid fa-newspaper' },
 ];
 
 const selectButton = (name: string) => {
