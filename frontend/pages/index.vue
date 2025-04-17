@@ -1,4 +1,3 @@
-<!-- App.vue -->
 <template>
   <div class="flex flex-col h-screen">
     <NavBar />
@@ -8,8 +7,8 @@
       <!-- Vertical Button Bar -->
       <div class="bg-base-200 p-2 flex flex-col space-y-2 min-w-[100px]">
         <ButtonBar 
-          :defaultSelected="selectedFeature" 
-          @update:selectedButton="updateSelectedFeature" 
+          :selectedFeature="selectedFeature" 
+          @update:selectedFeature="updateSelectedFeature" 
         />
       </div>
 
@@ -17,28 +16,28 @@
       <div class="flex flex-1 justify-center items-center">
         <!-- Camera Feature -->
         <CameraFeature 
-          v-if="selectedFeature === 'Text' || selectedFeature === 'Currency' || selectedFeature === 'Object' || selectedFeature === 'Distance' || selectedFeature === 'Product'" 
+          v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)" 
           ref="cameraFeatureRef"
           :featureType="selectedFeature"
           @take-snapshot="handleSnapshot"
         />
-        
-        <!-- Other features -->
-        <SpotifyFeature v-if="selectedFeature === 'Spotify'" />
+
+        <!-- Other Features -->
+        <SpotifyFeature v-if="selectedFeature === 'Music'" />
         <NewsFeature v-if="selectedFeature === 'News'" />
-        <ChatFeature v-if="selectedFeature === 'Chat'" />
+        <ChatFeature v-if="selectedFeature === 'Chatbot'" />
       </div>
     </div>
 
-    <!-- Always visible components like voice command -->
+    <!-- Voice Command always available -->
     <div class="fixed bottom-20 right-5">
-      <VoiceCommand @featureMatched="updateSelectedFeature" />
+      <VoiceCommand :selectedFeature="selectedFeature" @featureMatched="updateSelectedFeature" />
     </div>
 
     <!-- Audio Player -->
     <audio v-if="audioStore.currentAudio" :src="audioStore.currentAudio" autoplay style="display: none;"></audio>
 
-    <!-- Spotify Mini Player - only shown when in Music feature and a track is playing -->
+    <!-- Spotify Mini Player -->
     <SpotifyMiniPlayer 
       v-if="spotifyStore.currentTrack && selectedFeature === 'Music'" 
       @open-spotify-feature="openSpotifyFeature" 
@@ -92,12 +91,11 @@ const handleSnapshot = async (blob: Blob) => {
 };
 
 const openSpotifyFeature = () => {
-  selectedFeature.value = 'Spotify';
+  selectedFeature.value = 'Music';
 };
 
 // Lifecycle hooks
 onMounted(() => {
-  // Initialize player with tokens from environment variables
   spotifyStore.initializePlayerWithEnvTokens();
 });
 </script>

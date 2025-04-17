@@ -159,14 +159,6 @@
                 <circle cx="18" cy="16" r="3"></circle>
               </svg>
             </div>
-            <h3 class="text-xl font-bold text-white mb-2">Connect to Spotify</h3>
-            <p class="text-green-200 mb-6">Login to your Spotify account to search and play music</p>
-            <button 
-              @click="spotifyStore.authenticate" 
-              class="btn btn-lg bg-green-500 hover:bg-green-400 border-0 text-white"
-            >
-              Connect Account
-            </button>
           </div>
         </div>
       </div>

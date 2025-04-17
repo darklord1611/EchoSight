@@ -60,6 +60,9 @@ export function useApiService() {
             console.error('Error sending image to endpoint:', error);
             return null;
         }
+
+        
+
     };
 
     return {

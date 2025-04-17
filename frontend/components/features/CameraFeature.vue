@@ -5,8 +5,7 @@
         <Camera 
           :resolution="cameraResolution" 
           ref="cameraRef" 
-          autoplay 
-          class="w-full h-full" 
+          autoplay
         />
       </div>
       <div class="mt-4">

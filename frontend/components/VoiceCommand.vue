@@ -4,7 +4,7 @@
     <div v-if="feedback" class="voice-feedback mt-2 text-sm">
       {{ feedback }}
     </div>
-    <div v-if="activeFeature" class="available-commands mt-2 text-xs opacity-70">
+    <div v-if="props.selectedFeature" class="available-commands mt-2 text-xs opacity-70">
       <div>Available commands: {{ getAvailableCommands() }}</div>
     </div>
   </div>
@@ -20,10 +20,13 @@ const emit = defineEmits(['featureMatched']);
 const { $sendAudioForCommand } = useNuxtApp();
 const spotifyStore = useSpotifyStore();
 
+const props = defineProps({
+  selectedFeature: String,
+});
+
 // State
 const isRecording = ref(false);
 const decibelLevel = ref(0);
-const activeFeature = ref<string | null>(null);
 const feedback = ref<string | null>(null);
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
@@ -92,11 +95,11 @@ const cancelSpeech = () => {
 
 // Helper to get all available commands for current feature
 const getAvailableCommands = () => {
-  if (!activeFeature.value || !featureCommands[activeFeature.value]) {
+  if (!props.selectedFeature.value || !featureCommands[props.selectedFeature.value]) {
     return '';
   }
   
-  return Object.keys(featureCommands[activeFeature.value])
+  return Object.keys(featureCommands[props.selectedFeature.value])
     .map(command => command)
     .join(', ');
 };
@@ -188,11 +191,10 @@ const startRecording = async () => {
 
       if (featureMatch) {
         // User is selecting a feature
-        activeFeature.value = featureMatch;
         showFeedback(`Switched to ${featureMatch} mode`);
         emit('featureMatched', featureMatch);
       } 
-      else if (activeFeature.value) {
+      else if (props.selectedFeature.value) {
         // User is using a feature-specific command
         await handleFeatureCommand(lowerCommand);
       } 
@@ -230,7 +232,7 @@ const startRecording = async () => {
 
 // Handle feature-specific commands
 const handleFeatureCommand = async (command: string) => {
-  const currentFeature = activeFeature.value;
+  const currentFeature = props.selectedFeature.value;
   if (!currentFeature || !featureCommands[currentFeature]) {
     showFeedback(`The command "${command}" doesn't match any available feature.`);
     return;

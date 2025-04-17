@@ -6,7 +6,7 @@
       :key="button.name"
       @click="selectButton(button.name)"
       class="btn btn-circle"
-      :class="selectedButton === button.name ? 'btn-primary' : 'btn-ghost'"
+      :class="props.selectedFeature === button.name ? 'btn-primary' : 'btn-ghost'"
     >
       <i :class="button.icon"></i>
     </button>
@@ -17,15 +17,13 @@
 import { ref } from 'vue';
 
 const props = defineProps({
-  defaultSelected: {
+  selectedFeature: {
     type: String,
     default: 'Text'
   }
 });
 
-const emit = defineEmits(['update:selectedButton']);
-
-const selectedButton = ref(props.defaultSelected);
+const emit = defineEmits(['update:selectedFeature']);
 
 const buttons = [
   { name: 'Text', icon: 'fa-solid fa-quote-right' },
@@ -40,7 +38,9 @@ const buttons = [
 ];
 
 const selectButton = (name: string) => {
-  selectedButton.value = name;
-  emit('update:selectedButton', name);
+  // Voiceover using SpeechSynthesis
+  const message = new SpeechSynthesisUtterance(`Switched to ${name} mode`);
+  speechSynthesis.speak(message);
+  emit('update:selectedFeature', name);
 };
 </script>

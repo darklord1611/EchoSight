@@ -37,33 +37,14 @@ export const useSpotifyStore = defineStore('spotify', {
                 return;
             }
 
-            await this.refreshTokenIfNeeded();
+
             this.playerReady = true;
             console.log('Spotify player initialized with env tokens');
         },
 
-        async refreshTokenIfNeeded() {
-            if (!this.refreshToken) return;
-
-            try {
-                // This would typically be a server-side call to protect your client secret
-                const response = await axios.post('/api/spotify/refresh-token', {
-                    refresh_token: this.refreshToken
-                });
-
-                this.accessToken = response.data.access_token;
-                // Sometimes the refresh token is also rotated
-                if (response.data.refresh_token) {
-                    this.refreshToken = response.data.refresh_token;
-                }
-            } catch (error) {
-                console.error('Failed to refresh Spotify token:', error);
-            }
-        },
-
         async searchTracks(query: string) {
             if (!this.accessToken) {
-                await this.refreshTokenIfNeeded();
+
                 if (!this.accessToken) return [];
             }
 
@@ -82,7 +63,7 @@ export const useSpotifyStore = defineStore('spotify', {
                 return response.data.tracks.items;
             } catch (error) {
                 if (axios.isAxiosError(error) && error.response?.status === 401) {
-                    await this.refreshTokenIfNeeded();
+
                     // Try once more after token refresh
                     return this.searchTracks(query);
                 }
@@ -92,7 +73,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async playTrack(track: SpotifyTrack) {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 // Start playback on Spotify
@@ -104,9 +84,12 @@ export const useSpotifyStore = defineStore('spotify', {
                 this.currentTrack = track;
                 this.isPlaying = true;
                 this.playbackPosition = 0;
+
+                return
+
             } catch (error) {
                 if (axios.isAxiosError(error) && error.response?.status === 401) {
-                    await this.refreshTokenIfNeeded();
+
                     // Try once more after token refresh
                     return this.playTrack(track);
                 }
@@ -115,7 +98,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async pausePlayback() {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 await axios.put('https://api.spotify.com/v1/me/player/pause', {},
@@ -129,7 +111,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async resumePlayback() {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 await axios.put('https://api.spotify.com/v1/me/player/play', {},
@@ -143,7 +124,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async nextTrack() {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 await axios.post('https://api.spotify.com/v1/me/player/next', {},
@@ -158,7 +138,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async previousTrack() {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 await axios.post('https://api.spotify.com/v1/me/player/previous', {},
@@ -173,7 +152,6 @@ export const useSpotifyStore = defineStore('spotify', {
         },
 
         async getCurrentPlayback() {
-            if (!this.accessToken) await this.refreshTokenIfNeeded();
 
             try {
                 const response = await axios.get('https://api.spotify.com/v1/me/player',
@@ -221,7 +199,7 @@ export const useSpotifyStore = defineStore('spotify', {
                             const trackUri = data.result.spotify.uri;
 
                             // Step 2: Make sure a device is available
-                            await this.refreshTokenIfNeeded();
+
                             const devicesRes = await axios.get('https://api.spotify.com/v1/me/player/devices', {
                                 headers: {
                                     'Authorization': `Bearer ${this.accessToken}`
@@ -235,20 +213,6 @@ export const useSpotifyStore = defineStore('spotify', {
                             }
 
                             const activeDevice = devices.find((device: any) => device.is_active) || devices[0];
-
-                            // Step 3: Play the identified track
-                            await axios.put(
-                                'https://api.spotify.com/v1/me/player/play',
-                                { uris: [trackUri] },
-                                {
-                                    headers: {
-                                        'Authorization': `Bearer ${this.accessToken}`,
-                                    },
-                                    params: {
-                                        device_id: activeDevice.id
-                                    }
-                                }
-                            );
 
                             this.currentTrack = {
                                 id: data.result.spotify.id,

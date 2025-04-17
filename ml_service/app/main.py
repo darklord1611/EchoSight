@@ -344,7 +344,7 @@ raw_feature_labels = OrderedDict({
         "value", "convert currency", "exchange rate"
     ],
     "Object": [
-        "object", "describe", "thing", "what is this", "identify", "scan", "recognize", 
+        "object", "describe", "thing", "what is this", "identify", "scan", 
         "find", "detection", "look for", "object recognition"
     ],
     "Product": [
@@ -379,7 +379,7 @@ raw_feature_labels = OrderedDict({
         "end task", "stop operation"
     ],
     "Detect": [
-        "detect", "scan surroundings", "recognize object", "detect object", "scan area", 
+        "detect", "recognize", "scan surroundings", "recognize object", "detect object", "scan area", 
         "identify items", "find object"
     ],
     "Help": [
