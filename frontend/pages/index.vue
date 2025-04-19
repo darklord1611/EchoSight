@@ -6,21 +6,14 @@
     <div class="flex flex-grow">
       <!-- Vertical Button Bar -->
       <div class="bg-base-200 p-2 flex flex-col space-y-2 min-w-[100px]">
-        <ButtonBar 
-          :selectedFeature="selectedFeature" 
-          @update:selectedFeature="updateSelectedFeature" 
-        />
+        <ButtonBar :selectedFeature="selectedFeature" @update:selectedFeature="updateSelectedFeature" />
       </div>
 
       <!-- Feature Area -->
       <div class="flex flex-1 justify-center items-center">
         <!-- Camera Feature -->
-        <CameraFeature 
-          v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)" 
-          ref="cameraFeatureRef"
-          :featureType="selectedFeature"
-          @take-snapshot="handleSnapshot"
-        />
+        <CameraFeature v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)"
+          ref="cameraFeatureRef" :featureType="selectedFeature" @take-snapshot="handleSnapshot" />
 
         <!-- Other Features -->
         <SpotifyFeature v-if="selectedFeature === 'Music'" />
@@ -31,17 +24,13 @@
 
     <!-- Voice Command always available -->
     <div class="fixed bottom-20 right-5">
-      <VoiceCommand :selectedFeature="selectedFeature" @featureMatched="updateSelectedFeature" />
+      <VoiceCommand :selectedFeature="selectedFeature" :cameraRef="cameraFeatureRef"
+        @featureMatched="updateSelectedFeature" />
     </div>
 
-    <!-- Audio Player -->
-    <audio v-if="audioStore.currentAudio" :src="audioStore.currentAudio" autoplay style="display: none;"></audio>
-
     <!-- Spotify Mini Player -->
-    <SpotifyMiniPlayer 
-      v-if="spotifyStore.currentTrack && selectedFeature === 'Music'" 
-      @open-spotify-feature="openSpotifyFeature" 
-    />
+    <SpotifyMiniPlayer v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
+      @open-spotify-feature="openSpotifyFeature" />
 
     <!-- Modals -->
     <SettingsModal :show="isSettingsModalOpen" @close="isSettingsModalOpen = false" />
@@ -69,9 +58,9 @@ import ChatFeature from '@/components/features/ChatFeature.vue';
 
 // Refs
 const cameraFeatureRef = ref();
-const selectedFeature = ref<string>('Text');
-const isSettingsModalOpen = ref(false);
-const isAboutModalOpen = ref(false);
+const selectedFeature = ref<string>('Text'); // Ensures selectedFeature is typed correctly
+const isSettingsModalOpen = ref<boolean>(false);
+const isAboutModalOpen = ref<boolean>(false);
 
 // Stores
 const spotifyStore = useSpotifyStore();

@@ -191,15 +191,8 @@ def format_audio_response(response, task):
                 f"It was released in {response.get('year', 'an unknown year')}."
             )
 
-        case "article_reading":
-            full_text = (
-                "Here's the summary of the article you asked for: " + response
-            )
-
         case "general_question_answering":
-            full_text = (
-                "Here's the answer to your question: " + response
-            )
+            full_text = response
 
         case _:
             full_text = "I'm sorry, I couldn't determine the type of response to generate."
@@ -214,3 +207,23 @@ def format_audio_response(response, task):
     except Exception as e:
         logging.error(f"Error generating audio response: {e}")
         return None
+
+
+def format_article_audio_response(response):
+    try:
+        # Generate voice output using gTTS
+
+        full_text = f"Title: {response.title} \n\n Content: {response.text}"
+        audio_file = NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts = gTTS(full_text, lang="en")
+        tts.save(audio_file.name)
+
+        full_text = f"Title: {response.title} \n\n Summary: {response.summary}"
+        summary_audio_file = NamedTemporaryFile(delete=False, suffix=".mp3")
+        tts = gTTS(full_text, lang="en")
+        tts.save(summary_audio_file.name)
+
+        return audio_file.name, summary_audio_file.name
+    except Exception as e:
+        logging.error(f"Error generating audio response: {e}")
+        return None, None

@@ -1,10 +1,7 @@
-// services/apiService.ts
 import { v4 as uuidv4 } from 'uuid';
-import { useAudioStore } from '@/stores/audio';
 
 export function useApiService() {
     const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
-    const audioStore = useAudioStore();
 
     const endpoints: Record<string, string> = {
         'Text': '/document_recognition',
@@ -16,16 +13,19 @@ export function useApiService() {
         'Music': '/',
     };
 
+    const speakText = (text: string) => {
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = 'en-US'; // You can customize this
+        speechSynthesis.speak(utterance);
+    };
+
     const processImage = async (blob: Blob, buttonName: string) => {
         const endpoint = endpoints[buttonName];
         if (!endpoint) return;
 
         const fullUrl = `${BACKEND_URL}${endpoint}`;
-
-        const id = uuidv4(); // Unique ID for this snapshot
-        const timestamp = new Date().toISOString();
+        const id = uuidv4();
         const filename = `snapshot-${id}.jpg`;
-
         const file = new File([blob], filename, { type: "image/jpeg" });
 
         const formData = new FormData();
@@ -47,22 +47,16 @@ export function useApiService() {
             const jsonResponse = await response.json();
             console.log('JSON Response:', jsonResponse);
 
-            const audioPath = jsonResponse?.audio_path;
-            if (audioPath) {
-                const encodedAudioPath = encodeURIComponent(audioPath);
-                const audioFileUrl = `${BACKEND_URL}/download_audio?audio_path=${encodedAudioPath}`;
-                console.log('Audio File URL:', audioFileUrl);
-                audioStore.setCurrentAudio(audioFileUrl);
-            }
+            // 👇 Use speech synthesis to speak the text
+            const textToSpeak = jsonResponse?.text || jsonResponse?.description || jsonResponse?.result || 'No description available.';
+            speakText(textToSpeak);
 
             return jsonResponse;
         } catch (error) {
             console.error('Error sending image to endpoint:', error);
+            speakText("Sorry, something went wrong processing the image.");
             return null;
         }
-
-        
-
     };
 
     return {

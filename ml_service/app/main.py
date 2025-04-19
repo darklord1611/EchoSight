@@ -11,7 +11,7 @@ from sympy import content
 from app.article_reading.pipeline import execute_pipeline
 from app.question_answering.pipeline import ask_general_question
 from app.utils.deepgram import transcribe_audio
-from .utils.formatter import create_pdf, create_pdf_async, format_response_distance_estimate_with_openai, format_response_product_recognition_with_openai, format_audio_response
+from .utils.formatter import create_pdf, create_pdf_async, format_article_audio_response, format_response_distance_estimate_with_openai, format_response_product_recognition_with_openai, format_audio_response
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
 from .config import config
 from .text_recognition.provider.ocr.ocr import OcrRecognition
@@ -36,7 +36,7 @@ import os
 import tempfile
 import requests
 from collections import OrderedDict
-
+from .all_task.pipeline import get_llm_response
 
 start = time.time()
 ocr = OcrRecognition()
@@ -57,36 +57,22 @@ async def read_root():
 async def document_recognition(file: UploadFile = File(...)):
     try:
         start = time.time()
-        mime_type, _ = mimetypes.guess_type(file.filename)
-        print(f"MIME Type from original filename: {mime_type}")
+        image_data = await file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
 
-        if not mime_type or not mime_type.startswith("image/"):
-            raise HTTPException(
-                status_code=400, 
-                detail=f"Invalid MIME type: {mime_type}. Only image files are allowed."
-            )
-
-        with NamedTemporaryFile(delete=False, suffix=mimetypes.guess_extension(mime_type)) as temp:
-            temp.write(file.file.read())
-            temp_path = temp.name
-
-        ocr_result = ocr.recognize_text(temp_path).text
-        result = ocr_result
-
-        pdf_path = NamedTemporaryFile(delete=False, suffix=".pdf").name
-        asyncio.gather(
-            create_pdf_async(result, pdf_path)
+        result = get_llm_response(
+            query="Extract text from this image.",
+            task="text_recognition",
+            base64_image=base64_image,
         )
 
-        audio_file_path = format_audio_response(result, "text_recognition")
-        if audio_file_path:
-            return JSONResponse(content={
-                "text": result,
-                "pdf_path": pdf_path,
-                "audio_path": audio_file_path,
-            })
-        else:
-            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate text response")
+
+        return JSONResponse(content={
+            "status": "success",
+            "text": result,
+        })
 
     except Exception as e:
         print(f"Lỗi xảy ra: {e}")
@@ -96,59 +82,52 @@ async def document_recognition(file: UploadFile = File(...)):
 @app.post("/currency_detection")
 async def currency_detection(file: UploadFile = File(...)):
     try:
-        with NamedTemporaryFile(delete=False) as temp:
-            temp.write(file.file.read())
-            temp.close()
-            img = cv2.imread(temp.name)
-            currency_detector(img)
-            total_money = currency_detector.get_total_money()
+        start = time.time()
+        image_data = await file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
 
-            audio_path = format_audio_response(total_money, "currency_detection")
-            if audio_path:
-                return JSONResponse(content={
-                    "total_money": total_money,
-                    "audio_path": audio_path,
-                })
-            else:
-                raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        result = get_llm_response(
+            query="Extract text from this image.",
+            task="currency_detection",
+            base64_image=base64_image,
+        )
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate text response")
+
+        return JSONResponse(content={
+            "status": "success",
+            "text": result,
+        })
+
     except Exception as e:
-        print(e)
+        print(f"Lỗi xảy ra: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
     
 
 @app.post("/image_captioning")
 async def image_captioning(file: UploadFile = File(...)):
     try:
-        with NamedTemporaryFile(delete=False) as temp:
-            temp.write(file.file.read())
-            temp_path = temp.name 
+        start = time.time()
+        image_data = await file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
 
-        mime_type, _ = mimetypes.guess_type(file.filename)
-        if not mime_type:
-            raise HTTPException(status_code=400, detail="Cannot determine the mimetype of the uploaded file.")
+        result = get_llm_response(
+            query="Extract text from this image.",
+            task="image_captioning",
+            base64_image=base64_image,
+        )
 
-        provider = OpenAIProvider() 
-        base64_image = provider.encode_image(temp_path)
-        if not base64_image:
-            raise HTTPException(status_code=500, detail="Failed to encode image")
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate text response")
 
-
-        description = provider.frame_description(base64_image) 
-
-        if not description:
-            raise HTTPException(status_code=500, detail="Failed to generate image description")
-
-        audio_path = format_audio_response(description, "image_captioning")
-        if audio_path:
-            return JSONResponse(content={
-                "description": description,
-                "audio_path": audio_path,
-            })
-        else:
-            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        return JSONResponse(content={
+            "status": "success",
+            "text": result,
+        })
 
     except Exception as e:
-        print(e)
+        print(f"Lỗi xảy ra: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
     
@@ -156,27 +135,26 @@ async def image_captioning(file: UploadFile = File(...)):
 @app.post("/product_recognition")
 async def product_recognition(file: UploadFile = File(...)):
     try:
-        with NamedTemporaryFile(delete=False) as temp:
-            temp.write(file.file.read())
-            temp.flush()
-            img = cv2.imread(temp.name)
-            if img is None:
-                raise HTTPException(status_code=400, detail="Invalid image file")
-            result = barcode_processor.process_image(img)
-            print(result)
-            description = format_response_product_recognition_with_openai(result)
-            print(description)
+        start = time.time()
+        image_data = await file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
 
-            audio_path = format_audio_response(description, "product_recognition")
-            if audio_path:
-                return JSONResponse(content={
-                    "description": description,
-                    "audio_path": audio_path,
-                })
-            else:
-                raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        result = get_llm_response(
+            query="Extract text from this image.",
+            task="product_recognition",
+            base64_image=base64_image,
+        )
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate text response")
+
+        return JSONResponse(content={
+            "status": "success",
+            "text": result,
+        })
+
     except Exception as e:
-        print(e)
+        print(f"Lỗi xảy ra: {e}")
         raise HTTPException(status_code=500, detail="Internal server error")
 
 image_path = "./app/dis.jpg"  
@@ -362,7 +340,7 @@ raw_feature_labels = OrderedDict({
     "Music": [
         "music", "track", "what's playing", "music track", "listen", "audio"
     ],
-    "Article": [
+    "News": [
         "article", "news", "read article", "summary", "latest news", "news article", "current events", 
         "headlines", "news report", "summary of article"
     ],
@@ -386,6 +364,9 @@ raw_feature_labels = OrderedDict({
         "help", "assist", "guide", "support", "help me", "assist me", "I need help", 
         "provide assistance", "help with", "assist in", "guide me"
     ],
+    "Capture": [
+        "capture", "take a picture", "snap", "photo", "image", "snapshot", "take"
+    ]
 })
 
 # Deduplicate keywords across features
@@ -458,13 +439,29 @@ async def article_reading(file: UploadFile = File(...)):
         if "error" in news_query:
             raise HTTPException(status_code=400, detail="Failed to transcribe audio")
         
-        summary = execute_pipeline(news_query["transcript"])
+        articles = execute_pipeline(news_query["transcript"])
 
-        audio_path = format_audio_response(summary, "article_reading")
-        if audio_path:
-            return JSONResponse(content={
-                "summary": summary,
-                "audio_path": audio_path,
+        if not articles:
+            raise HTTPException(status_code=400, detail="No valid articles found")
+        
+        audio_path = []
+        for article in articles:
+            audio_file, summary_file = format_article_audio_response(article)
+            if audio_file:
+                audio_path.append((audio_file, summary_file))
+            else:
+                raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        
+        res = []
+
+        for i, article in enumerate(articles):
+            res.append({
+                "title": article.title,
+                "text": article.text,
+                "summary": article.summary,
+                "audio_path": audio_path[i][0],
+                "summary_audio_path": audio_path[i][1],
+                "url": article.url
             })
         else:
             raise HTTPException(status_code=500, detail="Failed to generate audio response")

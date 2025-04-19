@@ -20,9 +20,10 @@ const emit = defineEmits(['featureMatched']);
 const { $sendAudioForCommand } = useNuxtApp();
 const spotifyStore = useSpotifyStore();
 
-const props = defineProps({
-  selectedFeature: String,
-});
+const props = defineProps<{
+  selectedFeature: string;
+  cameraRef: Ref | null;
+}>();
 
 // State
 const isRecording = ref(false);
@@ -42,33 +43,46 @@ let speechDetected = false;
 let speechStartTime: number | null = null;
 let feedbackTimeout: number | null = null;  // Corrected type for browser-based code
 
+
+const globalCommands = {
+  stop: ['stop', 'mute', 'shut up', 'quiet'],
+  help: ['help', 'what can i say', 'commands'],
+  cancel: ['cancel', 'never mind'],
+};
+
 // Define available commands for each feature
 const featureCommands = {
   'Text': {
     'read': ['read', 'read text', 'read aloud'],
     'translate': ['translate', 'translate text'],
     'save': ['save', 'save text', 'remember'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Currency': {
     'convert': ['convert', 'exchange', 'calculate'],
     'compare': ['compare', 'difference'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Object': {
     'identify': ['identify', 'what is this', 'object'],
     'describe': ['describe', 'details', 'tell me more'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Product': {
     'search': ['search', 'find similar', 'shop'],
     'price': ['price', 'how much', 'cost'],
     'reviews': ['reviews', 'ratings'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Distance': {
     'measure': ['measure', 'how far', 'distance'],
     'compare': ['compare', 'difference'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Face': {
     'identify': ['identify', 'who is this', 'recognize'],
     'remember': ['remember', 'save face', 'add person'],
+    'capture': ['capture', 'take a picture', 'snapshot'],
   },
   'Music': {
     'detect': ['detect', 'what song', 'identify song', 'recognize'],
@@ -79,7 +93,7 @@ const featureCommands = {
     'ask': ['ask', 'question', 'help me'],
     'chat': ['chat', 'talk', 'converse'],
   },
-  'Article': {
+  'News': {
     'summarize': ['summarize', 'summary', 'brief'],
     'read': ['read', 'read aloud', 'narrate'],
   }
@@ -95,14 +109,15 @@ const cancelSpeech = () => {
 
 // Helper to get all available commands for current feature
 const getAvailableCommands = () => {
-  if (!props.selectedFeature.value || !featureCommands[props.selectedFeature.value]) {
-    return '';
+  const global = Object.keys(globalCommands).join(', ');
+  if (!props.selectedFeature || !featureCommands[props.selectedFeature]) {
+    return `Global: ${global}`;
   }
-  
-  return Object.keys(featureCommands[props.selectedFeature.value])
-    .map(command => command)
-    .join(', ');
+
+  const featureSpecific = Object.keys(featureCommands[props.selectedFeature]).join(', ');
+  return `Feature: ${featureSpecific} | Global: ${global}`;
 };
+
 
 // Start voice recording
 const startRecording = async () => {
@@ -126,7 +141,7 @@ const startRecording = async () => {
     source.connect(analyser);
 
     const dataArray = new Uint8Array(analyser.frequencyBinCount);
-    
+
     // Track audio levels for visualization and speech detection
     const trackDecibels = () => {
       if (!analyser || !isRecording.value) return;
@@ -174,7 +189,7 @@ const startRecording = async () => {
       // Process the audio for commands
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
       const commandText = await $sendAudioForCommand(blob);
-      
+
       if (!commandText) {
         showFeedback("Sorry, I didn't understand that.");
         resetSpeechFlags();
@@ -189,15 +204,20 @@ const startRecording = async () => {
         feature => feature.toLowerCase() === lowerCommand
       );
 
+      console.log('Feature match:', featureMatch);
+      console.log('Selected feature:', props.selectedFeature);
+      console.log("cameraRef:", props.cameraRef);
+      console.log("cameraRef.value:", props.cameraRef?.value);
+
       if (featureMatch) {
         // User is selecting a feature
         showFeedback(`Switched to ${featureMatch} mode`);
         emit('featureMatched', featureMatch);
-      } 
-      else if (props.selectedFeature.value) {
+      }
+      else if (props.selectedFeature) {
         // User is using a feature-specific command
         await handleFeatureCommand(lowerCommand);
-      } 
+      }
       else {
         // No feature selected yet
         showFeedback(`Please select a feature first. Say one of: ${Object.keys(featureCommands).join(', ')}`);
@@ -230,18 +250,24 @@ const startRecording = async () => {
   }
 };
 
-// Handle feature-specific commands
 const handleFeatureCommand = async (command: string) => {
-  const currentFeature = props.selectedFeature.value;
+  // 🔍 Check for global commands first
+  for (const action in globalCommands) {
+    if (globalCommands[action].some(phrase => command.includes(phrase))) {
+      await executeGlobalCommand(action);
+      return;
+    }
+  }
+
+  const currentFeature = props.selectedFeature;
   if (!currentFeature || !featureCommands[currentFeature]) {
     showFeedback(`The command "${command}" doesn't match any available feature.`);
     return;
   }
 
-  // Look for command match in the current feature
   const commands = featureCommands[currentFeature];
   let matchedAction = null;
-  
+
   for (const action in commands) {
     if (commands[action].some(phrase => command.includes(phrase))) {
       matchedAction = action;
@@ -256,37 +282,54 @@ const handleFeatureCommand = async (command: string) => {
   }
 };
 
+const executeGlobalCommand = async (action: string) => {
+  switch (action) {
+    case 'stop':
+      showFeedback('Stopping all audio...');
+      speechSynthesis.cancel();
+      if (spotifyStore.isPlaying) {
+        spotifyStore.togglePlayback();
+      }
+      break;
+
+    case 'help':
+      showFeedback(`Say one of these global commands: ${Object.keys(globalCommands).join(', ')}`);
+      break;
+
+    case 'cancel':
+      showFeedback('Okay, canceled.');
+      break;
+
+    default:
+      showFeedback(`Unknown global command: ${action}`);
+  }
+};
+
+
+
 // Execute the matched command
 const executeCommand = async (feature: string, action: string, originalCommand: string) => {
   showFeedback(`Executing: ${action} for ${feature}`);
-  
+
+  console.log(`Executing command: ${action} for feature: ${feature}`);
+
   switch (feature) {
     case 'Music':
       await executeMusicCommand(action);
       break;
     case 'Text':
-      await executeTextCommand(action);
-      break;
     case 'Currency':
-      await executeCurrencyCommand(action);
-      break;
     case 'Object':
-      await executeObjectCommand(action);
-      break;
     case 'Product':
-      await executeProductCommand(action);
-      break;
     case 'Distance':
-      await executeDistanceCommand(action);
-      break;
     case 'Face':
-      await executeFaceCommand(action);
+      await executeCameraCommand(feature);
       break;
     case 'Chatbot':
       await executeChatbotCommand(action);
       break;
-    case 'Article':
-      await executeArticleCommand(action);
+    case 'News':
+      await executeNewsCommand(action);
       break;
     default:
       showFeedback(`Feature ${feature} not yet implemented`);
@@ -298,10 +341,10 @@ const executeMusicCommand = async (action: string) => {
   switch (action) {
     case 'detect':
       showFeedback('Detecting music...');
-      
+
       // Stop the microphone before music detection
       stopRecording();
-      
+
       try {
         await spotifyStore.detectMusic();
         showFeedback('Music detection complete.');
@@ -313,7 +356,7 @@ const executeMusicCommand = async (action: string) => {
         startRecording();
       }
       break;
-      
+
     case 'play':
       showFeedback('Playing music');
       if (spotifyStore.currentTrack) {
@@ -322,7 +365,7 @@ const executeMusicCommand = async (action: string) => {
         speak('No music is currently loaded.');
       }
       break;
-      
+
     case 'pause':
       showFeedback('Pausing music');
       if (spotifyStore.isPlaying) {
@@ -335,34 +378,15 @@ const executeMusicCommand = async (action: string) => {
 };
 
 // Function stubs for other feature commands
-const executeTextCommand = async (action: string) => {
-  speak(`Executing ${action} for text feature`);
-  // Implementation would depend on your text feature capabilities
-};
-
-const executeCurrencyCommand = async (action: string) => {
-  speak(`Executing ${action} for currency feature`);
-  // Implementation would depend on your currency feature capabilities
-};
-
-const executeObjectCommand = async (action: string) => {
-  speak(`Executing ${action} for object recognition feature`);
-  // Implementation would depend on your object recognition feature capabilities
-};
-
-const executeProductCommand = async (action: string) => {
-  speak(`Executing ${action} for product feature`);
-  // Implementation would depend on your product feature capabilities
-};
-
-const executeDistanceCommand = async (action: string) => {
-  speak(`Executing ${action} for distance feature`);
-  // Implementation would depend on your distance feature capabilities
-};
-
-const executeFaceCommand = async (action: string) => {
-  speak(`Executing ${action} for face recognition feature`);
-  // Implementation would depend on your face recognition feature capabilities
+const executeCameraCommand = async (action: string) => {
+  console.log("Taking a snapshot with current feature:", action);
+  if (props.cameraRef) {
+    props.cameraRef.takeSnapshot();
+    showFeedback(`Capturing snapshot for ${action}...`);
+  } else {
+    showFeedback(`Camera not ready.`);
+  }
+  return;
 };
 
 const executeChatbotCommand = async (action: string) => {
@@ -370,21 +394,21 @@ const executeChatbotCommand = async (action: string) => {
   // Implementation would depend on your chatbot feature capabilities
 };
 
-const executeArticleCommand = async (action: string) => {
-  speak(`Executing ${action} for article feature`);
-  // Implementation would depend on your article feature capabilities
+const executeNewsCommand = async (action: string) => {
+  speak(`Executing ${action} for News feature`);
+  // Implementation would depend on your News feature capabilities
 };
 
 // Display feedback and speak it
 const showFeedback = (message: string) => {
   feedback.value = message;
   speak(message);
-  
+
   // Clear feedback after a delay
   if (feedbackTimeout) {
     clearTimeout(feedbackTimeout);
   }
-  
+
   feedbackTimeout = setTimeout(() => {
     feedback.value = null;
   }, FEEDBACK_DURATION);
@@ -399,22 +423,22 @@ const speak = (text: string) => {
 // Stop recording
 const stopRecording = () => {
   isRecording.value = false;
-  
+
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop();
   }
-  
+
   clearInterval(intervalId);
-  
+
   if (audioContext) {
     audioContext.suspend(); // Use suspend instead of close for temporary stopping
   }
-  
+
   // Release media tracks
   if (mediaRecorder?.stream) {
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
   }
-  
+
   // Clear the recorder
   mediaRecorder = null;
 };
