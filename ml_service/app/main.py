@@ -1,15 +1,17 @@
 import base64
 import cv2
-from fastapi import FastAPI
+from fastapi import FastAPI, Form
 from fastapi.responses import JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from fpdf import FPDF
 import numpy as np
 import openai
-from pydantic import Json
+from pydantic import BaseModel, Json
 from sympy import content
 
 from app.article_reading.pipeline import execute_pipeline
 from app.question_answering.pipeline import ask_general_question
+from app.utils.audio import FEATURE_KEYWORDS_FOR_SEMANTIC_MATCH, FEATURE_LABELS, FEATURE_NAMES, find_navigation_intent, route_query_semantically
 from app.utils.deepgram import transcribe_audio
 from .utils.formatter import create_pdf, create_pdf_async, format_article_audio_response, format_response_distance_estimate_with_openai, format_response_product_recognition_with_openai, format_audio_response
 from .currency_detection.yolov8.YOLOv8 import YOLOv8
@@ -39,15 +41,15 @@ from collections import OrderedDict
 from .all_task.pipeline import get_llm_response
 
 start = time.time()
-ocr = OcrRecognition()
-currency_detection_model_path = "./models/best8.onnx"
-currency_detector = YOLOv8(currency_detection_model_path, conf_thres=0.2, iou_thres=0.3)
-barcode_processor = BarcodeProcessor()
-distance_estimation_model_path = "./models/yolov8m.onnx"
+# ocr = OcrRecognition()
+# currency_detection_model_path = "./models/best8.onnx"
+# currency_detector = YOLOv8(currency_detection_model_path, conf_thres=0.2, iou_thres=0.3)
+# barcode_processor = BarcodeProcessor()
+# distance_estimation_model_path = "./models/yolov8m.onnx"
 print(f"All Models loaded in {time.time() - start:.2f} seconds", file=sys.stderr)
 
-
 app = FastAPI()
+# Define allowed origins (frontend URLs)
 
 @app.get("/")
 async def read_root():
@@ -306,87 +308,120 @@ async def music_detection(file: UploadFile = File(...)):
         print(e)
         raise HTTPException(status_code=500, detail="Internal server error")
 
+embedder = SentenceTransformer("all-MiniLM-L6-v2")
 
+# --- Modified API Endpoint ---
+# @app.post("/transcribe_audio_v2")
+async def process_voice_command(file: UploadFile = File(...), current_feature: str | None = None):
+    """
+    Processes voice input, distinguishing navigation commands from feature queries.
 
+    Args:
+        file: The uploaded audio file (.webm format expected).
+        current_feature: The key/name of the feature currently active in the UI (optional).
+                         Helps disambiguate queries. e.g., "News", "Text".
 
-embedder = SentenceTransformer('all-MiniLM-L6-v2')
+    Returns:
+        A dictionary containing the transcription, recognized intent ('navigate' or 'query'),
+        target feature, confidence score, and original query text if applicable.
+    """
+    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
+        tmp.write(await file.read())
+        tmp_path = tmp.name
 
-# Initial unordered feature labels (prioritizing more distinct features first)
-raw_feature_labels = OrderedDict({
-    "Text": [
-        "read", "text", "document", "page", "story", "paragraph", "article", "content", 
-        "read aloud", "narrate", "text to speech"
-    ],
-    "Currency": [
-        "money", "bill", "coin", "cash", "cost", "amount", "price", "total", "currency", 
-        "value", "convert currency", "exchange rate"
-    ],
-    "Object": [
-        "object", "describe", "thing", "what is this", "identify", "scan", 
-        "find", "detection", "look for", "object recognition"
-    ],
-    "Product": [
-        "product", "brand", "logo", "item", "product name", "identify product", "check product", 
-        "product details", "product information"
-    ],
-    "Distance": [
-        "distance", "range", "how far", "measure", "long", "distance to", "how far is", 
-        "how much is the distance", "measure distance", "range of"
-    ],
-    "Face": [
-        "face", "who is this", "person", "identify person", "recognize face", "face recognition", 
-        "who is the person", "show me the face"
-    ],
-    "Music": [
-        "music", "track", "what's playing", "music track", "listen", "audio"
-    ],
-    "News": [
-        "article", "news", "read article", "summary", "latest news", "news article", "current events", 
-        "headlines", "news report", "summary of article"
-    ],
-    "Chatbot": [
-        "chat", "talk", "conversation", "ask", "question", "chatbot", "ask a question", 
-        "speak to", "let's talk", "chat with", "conversation with assistant"
-    ],
-    "Play": [
-        "play", "begin", "launch", "initiate", "start playback", "begin function", 
-        "start process", "launch task", "begin operation"
-    ],
-    "Stop": [
-        "stop", "pause", "halt", "end", "pause function", "halt process", "cancel", 
-        "end task", "stop operation"
-    ],
-    "Detect": [
-        "detect", "recognize", "scan surroundings", "recognize object", "detect object", "scan area", 
-        "identify items", "find object"
-    ],
-    "Help": [
-        "help", "assist", "guide", "support", "help me", "assist me", "I need help", 
-        "provide assistance", "help with", "assist in", "guide me"
-    ],
-    "Capture": [
-        "capture", "take a picture", "snap", "photo", "image", "snapshot", "take"
-    ]
-})
+    try:
+        transcript_result = transcribe_audio(tmp_path)
 
-# Deduplicate keywords across features
-used_keywords = set()
-deduped_feature_labels = {}
+        if not transcript_result or "transcript" not in transcript_result:
+             raise HTTPException(status_code=500, detail="Transcription failed.")
 
-for feature, keywords in raw_feature_labels.items():
-    unique_keywords = []
-    for keyword in keywords:
-        lower_keyword = keyword.lower()
-        if lower_keyword not in used_keywords:
-            unique_keywords.append(keyword)
-            used_keywords.add(lower_keyword)
-    deduped_feature_labels[feature] = unique_keywords
+        transcript_text = transcript_result.get("transcript", "").strip()
 
-FEATURE_LABELS = deduped_feature_labels
+        if not transcript_text:
+             raise HTTPException(status_code=400, detail="Empty transcript received.")
+
+        # --- STAGE 1: Check for Navigation Intent ---
+        navigation_result = find_navigation_intent(transcript_text)
+
+        if navigation_result:
+            # It's a command to navigate!
+            return {
+                "transcript": transcript_result,
+                "intent": navigation_result["intent"],
+                "command": navigation_result["target_feature"],
+                "confidence": navigation_result["confidence"],
+                "query": None # Not a query
+            }
+
+        # --- STAGE 2: Treat as Query (if not navigation) ---
+        # Option A: If context is known, assume query is for the current feature
+        if current_feature and current_feature in FEATURE_NAMES: # Check if valid feature key
+             # Simple Action Keywords check within current context (e.g., "stop", "play")
+             # These might override semantic routing if they are very clear actions
+             if transcript_text.lower() == "stop":
+                  return {
+                       "transcript": transcript_result,
+                       "intent": "action", # Could be a specific 'action' intent
+                       "target_feature": current_feature, # Action applies to current feature
+                       "command": "Stop", # Specific action identified
+                       "confidence": 0.99,
+                       "query": transcript_text
+                  }
+             if transcript_text.lower() == "play":
+                   return {
+                       "transcript": transcript_result,
+                       "intent": "action",
+                       "target_feature": current_feature,
+                       "command": "Play",
+                       "confidence": 0.99,
+                       "query": transcript_text
+                  }
+
+             # Otherwise, it's a query for the current feature
+             return {
+                "transcript": transcript_result,
+                "intent": "query",
+                "command": current_feature, # Route to the active feature
+                "confidence": 0.90, # High confidence because context is provided
+                "query": transcript_text
+             }
+
+        # Option B: Context unknown or it's a query needing routing
+        # Use semantic similarity to find the best feature *for the query*
+        semantic_routing_result = route_query_semantically(
+            transcript_text,
+            embedder,
+            FEATURE_KEYWORDS_FOR_SEMANTIC_MATCH # Use the detailed keywords here
+        )
+
+        return {
+            "transcript": transcript_result,
+            "intent": semantic_routing_result["intent"],
+            "command": semantic_routing_result["target_feature"],
+            "confidence": semantic_routing_result["confidence"],
+            "query": semantic_routing_result["query"]
+        }
+
+    except Exception as e:
+        print(f"❌ Error processing voice command: {e}")
+        # Log the exception traceback for debugging
+        import traceback
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Failed to process audio: {str(e)}")
+    finally:
+        # Clean up the temporary file
+        import os
+        if 'tmp_path' in locals() and os.path.exists(tmp_path):
+             os.unlink(tmp_path)
+
+from typing import Annotated
 
 
 @app.post("/transcribe_audio")
-async def voice_command(file: UploadFile = File(...)):
+async def voice_command(
+    file: Annotated[UploadFile, File()],
+    current_feature: Annotated[str, Form()]
+    ):
     with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
         tmp.write(await file.read())
         tmp_path = tmp.name
@@ -395,14 +430,34 @@ async def voice_command(file: UploadFile = File(...)):
         transcript_result = transcribe_audio(tmp_path)
         transcript_text = transcript_result.get("transcript", "").lower()
 
+        print("Transcript:", transcript_text)
+        print("Current Feature:", current_feature)
+
         # Step 1: Exact keyword match
         for label, keywords in FEATURE_LABELS.items():
             for keyword in keywords:
                 if keyword.lower() in transcript_text:
+                    if label == current_feature:
+                        if "read" not in transcript_text.lower():
+                            return {
+                                "command": current_feature,
+                                "intent": "query",
+                                "confidence": 0.9,  # high confidence
+                                "query": transcript_text
+                            }
+                        else:
+                            return {
+                                "command": current_feature,
+                                "intent": "read",
+                                "confidence": 0.9,  # high confidence
+                                "query": transcript_text
+                            }
+                        
                     return {
-                        "transcript": transcript_result,
                         "command": label,
+                        "intent": "navigate",
                         "confidence": 1.0,  # exact match = high confidence
+                        "query": transcript_text
                     }
 
         # Step 2: Semantic similarity fallback
@@ -417,40 +472,34 @@ async def voice_command(file: UploadFile = File(...)):
                     best_match, best_score = label, score
 
         return {
-            "transcript": transcript_result,
             "command": best_match,
-            "confidence": round(best_score, 3)
+            "intent": "navigate",
+            "confidence": round(best_score, 3),
+            "query": transcript_text
         }
     except Exception as e:
         print("❌ Error:", e)
         return {"error": "Failed to process audio."}
 
 
-@app.post("/article_reading")
-async def article_reading(file: UploadFile = File(...)):
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+class NewsQuery(BaseModel):
+    news_query: str
+
+@app.post("/fetching_news")
+async def article_reading(news_query: str = Form(...)):
 
     try:
-        news_query = transcribe_audio(tmp_path)        
+        if not news_query:
+            raise HTTPException(status_code=400, detail="No news query provided")       
 
         # process audio to extract the news query
         if "error" in news_query:
             raise HTTPException(status_code=400, detail="Failed to transcribe audio")
         
-        articles = execute_pipeline(news_query["transcript"])
+        articles = execute_pipeline(news_query)
 
         if not articles:
             raise HTTPException(status_code=400, detail="No valid articles found")
-        
-        audio_path = []
-        for article in articles:
-            audio_file, summary_file = format_article_audio_response(article)
-            if audio_file:
-                audio_path.append((audio_file, summary_file))
-            else:
-                raise HTTPException(status_code=500, detail="Failed to generate audio response")
         
         res = []
 
@@ -459,15 +508,18 @@ async def article_reading(file: UploadFile = File(...)):
                 "title": article.title,
                 "text": article.text,
                 "summary": article.summary,
-                "audio_path": audio_path[i][0],
-                "summary_audio_path": audio_path[i][1],
                 "url": article.url
             })
-        else:
-            raise HTTPException(status_code=500, detail="Failed to generate audio response")
+        
+
+        return JSONResponse(content={
+            "articles": res,
+            
+        },
+        status_code=200)  # Explicitly return 200 OK)
     except Exception as e:
         print(e)
-        raise HTTPException(status_code=500, detail="Internal server error")
+        return {"error": "Failed to process audio."}
 
 @app.post("/general_question_answering")
 async def general_qa(file: UploadFile = File(...)):

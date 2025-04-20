@@ -88,12 +88,8 @@ def extract_articles(urls):
 
     for url in urls:
         try:
-            response = requests.get(url, headers=headers)
-            response.raise_for_status()
-
             article = Article(url)
-            article.set_html(response.text)
-            article.download(input_html=response.text)
+            article.download()
             article.parse()
             article.nlp()
 

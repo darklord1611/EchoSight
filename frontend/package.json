@@ -12,6 +12,7 @@
   "dependencies": {
     "@formkit/auto-animate": "^0.8.2",
     "@nuxtjs/tailwindcss": "^6.12.2",
+    "@ricky0123/vad-web": "^0.0.22",
     "axios": "^1.8.4",
     "dotenv": "^16.5.0",
     "express": "^5.1.0",
@@ -26,6 +27,7 @@
   },
   "devDependencies": {
     "cross-env": "^7.0.3",
-    "daisyui": "^4.12.14"
+    "daisyui": "^4.12.14",
+    "vite-plugin-static-copy": "^2.3.1"
   }
 }

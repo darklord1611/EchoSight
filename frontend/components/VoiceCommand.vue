@@ -15,7 +15,13 @@ import { ref, onMounted, onUnmounted, computed } from 'vue';
 import { useNuxtApp } from '#app';
 import VoiceVisualizer from './VoiceVisualizer.vue';
 import { useSpotifyStore } from '@/stores/spotify';
+import { useNewsStore } from '@/stores/news';
 
+import { MicVAD } from "@ricky0123/vad-web";
+
+let vad: MicVAD | null = null;
+
+const newsStore = useNewsStore();
 const emit = defineEmits(['featureMatched']);
 const { $sendAudioForCommand } = useNuxtApp();
 const spotifyStore = useSpotifyStore();
@@ -43,6 +49,7 @@ let speechDetected = false;
 let speechStartTime: number | null = null;
 let feedbackTimeout: number | null = null;  // Corrected type for browser-based code
 
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
 
 const globalCommands = {
   stop: ['stop', 'mute', 'shut up', 'quiet'],
@@ -119,6 +126,134 @@ const getAvailableCommands = () => {
 };
 
 
+const startRecordingV2 = async () => {
+  console.log("Starting VAD...");
+  if (isRecording.value) return;
+
+  try {
+    vad = await MicVAD.new({
+      onSpeechStart: () => {
+        console.log('🗣 Speech started');
+      },
+      onSpeechEnd: async (audio: Float32Array) => {
+        console.log('🛑 Speech ended');
+        isRecording.value = false;
+
+        if (!speechDetected) {
+          console.log('❌ No significant speech detected. Skipping request.');
+          return;
+        }
+
+        // Convert Float32Array to Blob
+        const blob = new Blob([audio.buffer], { type: 'audio/webm' });
+        // Process the audio for commands
+        const data = await $sendAudioForCommand(props.selectedFeature, blob);
+
+
+        const commandText = data.command;
+
+        // if the current feature matched the command then it is a query of the feature
+        if (props.selectedFeature === data.command && data.intent === "query") {
+          if (props.selectedFeature === "News") {
+            showFeedback("Fetching required articles...")
+            newsStore.fetchNews(data.query);
+            return
+          } else if (props.selectedFeature === "Chatbot") {
+            showFeedback("Fetching required response...")
+            return;
+          }
+        }
+
+        if (!commandText) {
+          showFeedback("Sorry, I didn't understand that.");
+          return;
+        }
+
+        const lowerCommand = commandText.toLowerCase();
+        console.log('Voice command recognized:', lowerCommand);
+
+
+        // Check if command is a feature selection
+        const featureMatch = Object.keys(featureCommands).find(
+          feature => feature.toLowerCase() === lowerCommand
+        );
+
+        console.log('Feature match:', featureMatch);
+        console.log('Selected feature:', props.selectedFeature);
+        console.log("cameraRef:", props.cameraRef);
+
+        if (featureMatch) {
+          // User is selecting a feature
+          showFeedback(`Switched to ${featureMatch} mode`);
+          emit('featureMatched', featureMatch);
+        }
+        else if (props.selectedFeature) {
+          // User is using a feature specific command
+          await handleFeatureCommand(lowerCommand);
+        }
+        else {
+          // No feature selected yet
+          showFeedback(`Please select a feature first. Say one of: ${Object.keys(featureCommands).join(', ')}`);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Error starting VAD:', error);
+    showFeedback('Unable to access microphone. Please check permissions.');
+  }
+};
+
+//////////////// ARTICLE_SECTION //////////////////////
+
+const ordinalMap: Record<string, number> = {
+  first: 0,
+  second: 1,
+  third: 2,
+  fourth: 3,
+  fifth: 4,
+  sixth: 5,
+  seventh: 6,
+  eighth: 7,
+  ninth: 8,
+  tenth: 9
+};
+const getArticleIndexFromCommand = (command: string): number | null => {
+  const lower = command.toLowerCase();
+
+  // Match "first", "second", etc.
+  for (const key in ordinalMap) {
+    console.log(key)
+    if (lower.includes(key)) return ordinalMap[key];
+  }
+
+  // Match digits (e.g. "read article 3")
+  const match = lower.match(/(?:article\s*)?(\d+)/);
+  if (match && match[1]) {
+    const num = parseInt(match[1]);
+    if (!isNaN(num) && num >= 1 && num <= newsStore.articles.length) {
+      return num - 1;
+    }
+  }
+
+  return null;
+};
+
+const findArticleByQuery = (query: string) => {
+  const lowerQuery = query.toLowerCase();
+  return newsStore.articles.find(article =>
+    article.title.toLowerCase().includes(lowerQuery) ||
+    article.summary?.toLowerCase().includes(lowerQuery)
+  );
+};
+
+const speakArticle = async (article: { title: string; summary: string }) => {
+  const utterance = new SpeechSynthesisUtterance(`${article.title}. ${article.summary}`);
+  utterance.lang = 'en-US';
+  speechSynthesis.speak(utterance);
+};
+
+/////////////////////////////////////////////////////
+
 // Start voice recording
 const startRecording = async () => {
   // If recording is already active, do nothing
@@ -144,7 +279,7 @@ const startRecording = async () => {
 
     // Track audio levels for visualization and speech detection
     const trackDecibels = () => {
-      if (!analyser || !isRecording.value) return;
+      if (!analyser || !isRecording.value || speechSynthesis.speaking) return;
 
       analyser.getByteTimeDomainData(dataArray);
       let sum = 0;
@@ -177,6 +312,12 @@ const startRecording = async () => {
 
       // Don't process if we manually stopped recording for music detection
       if (!isRecording.value) {
+        console.log('Recording stopped manually. Skipping processing.');
+        return;
+      }
+
+      if(speechSynthesis.speaking) {
+        console.log('🛑 Speech synthesis is active. Skipping processing.');
         return;
       }
 
@@ -188,7 +329,39 @@ const startRecording = async () => {
 
       // Process the audio for commands
       const blob = new Blob(audioChunks, { type: 'audio/webm' });
-      const commandText = await $sendAudioForCommand(blob);
+      const data = await $sendAudioForCommand(props.selectedFeature, blob);
+
+
+      const commandText = data.command;
+
+      if (data.query === "") {
+        console.log("Nothing to record")
+        resetSpeechFlags();
+        return;
+      }
+
+      // if the current feature matched the command then it is a query of the feature
+      if (props.selectedFeature === data.command && data.command === "News") {
+        if (data.intent === "read" || commandText.toLowerCase().includes("read")) {
+          const articleIndex = getArticleIndexFromCommand(data.query);
+          if (articleIndex !== null && newsStore.articles[articleIndex]) {
+            const article = newsStore.articles[articleIndex];
+            showFeedback(`Reading article ${articleIndex + 1}...`);
+            await speakArticle(article);
+          } else {
+            showFeedback("Sorry, I couldn't find which article you wanted me to read.");
+          }
+          return;
+        }
+
+        // Normal query intent
+        if (data.intent === "query" && data.command === "News") {
+          showFeedback("Fetching required articles...");
+          await newsStore.fetchNews(data.query);
+          showFeedback("Articles updated.");
+          return;
+        }
+      }
 
       if (!commandText) {
         showFeedback("Sorry, I didn't understand that.");
@@ -207,7 +380,6 @@ const startRecording = async () => {
       console.log('Feature match:', featureMatch);
       console.log('Selected feature:', props.selectedFeature);
       console.log("cameraRef:", props.cameraRef);
-      console.log("cameraRef.value:", props.cameraRef?.value);
 
       if (featureMatch) {
         // User is selecting a feature
@@ -400,38 +572,50 @@ const executeNewsCommand = async (action: string) => {
 };
 
 // Display feedback and speak it
-const showFeedback = (message: string) => {
+const showFeedback = async (message: string, delayAfter: number = 1000) => {
   feedback.value = message;
-  speak(message);
 
-  // Clear feedback after a delay
-  if (feedbackTimeout) {
-    clearTimeout(feedbackTimeout);
+  // Stop listening before speaking
+  if (isRecording.value) {
+    stopRecording();
   }
 
+  await speak(message);
+  await sleep(delayAfter);
+
+  // Restart listening after speaking
+  startRecording();
+
+  if (feedbackTimeout) clearTimeout(feedbackTimeout);
   feedbackTimeout = setTimeout(() => {
     feedback.value = null;
   }, FEEDBACK_DURATION);
 };
 
 // Text-to-speech
-const speak = (text: string) => {
-  const utterance = new SpeechSynthesisUtterance(text);
-  speechSynthesis.speak(utterance);
+const speak = (text: string): Promise<void> => {
+  return new Promise(resolve => {
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.onend = () => resolve();
+    speechSynthesis.speak(utterance);
+  });
 };
 
-// Stop recording
-const stopRecording = () => {
+
+const stopRecording = async () => {
   isRecording.value = false;
 
+  // Stop the recorder if active
   if (mediaRecorder && mediaRecorder.state === 'recording') {
     mediaRecorder.stop();
   }
 
+  // Stop refreshing audio chunks
   clearInterval(intervalId);
 
+  // Suspend audio context
   if (audioContext) {
-    audioContext.suspend(); // Use suspend instead of close for temporary stopping
+    await audioContext.suspend(); // Wait for suspend to complete
   }
 
   // Release media tracks
@@ -439,7 +623,8 @@ const stopRecording = () => {
     mediaRecorder.stream.getTracks().forEach(track => track.stop());
   }
 
-  // Clear the recorder
+  // Reset everything
+  audioChunks = [];
   mediaRecorder = null;
 };
 
