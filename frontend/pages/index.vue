@@ -10,10 +10,19 @@
       </div>
 
       <!-- Feature Area -->
-      <div class="flex flex-1 justify-center items-center">
+      <div class="flex flex-1 flex-col justify-center items-center space-y-4">
         <!-- Camera Feature -->
-        <CameraFeature v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)"
-          ref="cameraFeatureRef" :featureType="selectedFeature" @take-snapshot="handleSnapshot" />
+        <CameraFeature
+          v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)"
+          ref="cameraFeatureRef"
+          :featureType="selectedFeature"
+          @take-snapshot="handleSnapshot"
+        />
+
+        <!-- Response from camera -->
+        <div v-if="cameraResponseText" class="bg-base-200 rounded-lg p-4 shadow-md max-w-xl text-center">
+          <p class="text-base-content font-medium">{{ cameraResponseText }}</p>
+        </div>
 
         <!-- Other Features -->
         <SpotifyFeature v-if="selectedFeature === 'Music'" />
@@ -24,13 +33,18 @@
 
     <!-- Voice Command always available -->
     <div class="fixed bottom-20 right-5">
-      <VoiceCommand :selectedFeature="selectedFeature" :cameraRef="cameraFeatureRef"
-        @featureMatched="updateSelectedFeature" />
+      <VoiceCommand
+        :selectedFeature="selectedFeature"
+        :cameraRef="cameraFeatureRef"
+        @featureMatched="updateSelectedFeature"
+      />
     </div>
 
     <!-- Spotify Mini Player -->
-    <SpotifyMiniPlayer v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
-      @open-spotify-feature="openSpotifyFeature" />
+    <SpotifyMiniPlayer
+      v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
+      @open-spotify-feature="openSpotifyFeature"
+    />
 
     <!-- Modals -->
     <SettingsModal :show="isSettingsModalOpen" @close="isSettingsModalOpen = false" />
@@ -58,9 +72,10 @@ import ChatFeature from '@/components/features/ChatFeature.vue';
 
 // Refs
 const cameraFeatureRef = ref();
-const selectedFeature = ref<string>('Text'); // Ensures selectedFeature is typed correctly
+const selectedFeature = ref<string>('Text');
 const isSettingsModalOpen = ref<boolean>(false);
 const isAboutModalOpen = ref<boolean>(false);
+const cameraResponseText = ref<string>('');
 
 // Stores
 const spotifyStore = useSpotifyStore();
@@ -70,12 +85,18 @@ const apiService = useApiService();
 // Methods
 const updateSelectedFeature = (featureName: string) => {
   selectedFeature.value = featureName;
+  cameraResponseText.value = ''; // Clear result when switching features
   console.log(`Selected feature: ${featureName}`);
 };
 
 const handleSnapshot = async (blob: Blob) => {
   if (blob) {
-    apiService.processImage(blob, selectedFeature.value);
+    const result = await apiService.processImage(blob, selectedFeature.value);
+    if (result?.text) {
+      cameraResponseText.value = result.text;
+    } else {
+      cameraResponseText.value = 'No description available.';
+    }
   }
 };
 
@@ -83,8 +104,7 @@ const openSpotifyFeature = () => {
   selectedFeature.value = 'Music';
 };
 
-// Lifecycle hooks
+// Lifecycle
 onMounted(() => {
-  spotifyStore.initializePlayerWithEnvTokens();
 });
 </script>

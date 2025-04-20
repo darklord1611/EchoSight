@@ -485,6 +485,9 @@ async def voice_command(
 class NewsQuery(BaseModel):
     news_query: str
 
+class ChatbotQuery(BaseModel):
+    message: str
+
 @app.post("/fetching_news")
 async def article_reading(news_query: str = Form(...)):
 
@@ -522,33 +525,24 @@ async def article_reading(news_query: str = Form(...)):
         return {"error": "Failed to process audio."}
 
 @app.post("/general_question_answering")
-async def general_qa(file: UploadFile = File(...)):
-    # Step 1: Save uploaded audio to a temporary file
-    with tempfile.NamedTemporaryFile(delete=False, suffix=".webm") as tmp:
-        tmp.write(await file.read())
-        tmp_path = tmp.name
+async def general_qa(message: str = Form(...)):
 
     try:
-        # Step 2: Transcribe audio to text
-        transcript_result = transcribe_audio(tmp_path)
-
-        if "error" in transcript_result:
-            raise HTTPException(status_code=400, detail="Failed to transcribe audio")
-
-        question = transcript_result["transcript"]
 
         # Step 3: Ask the LLM to answer the question
-        answer = ask_general_question(question)
+        answer = get_llm_response(
+            query=message,
+            task="general_question_answering",
+            base64_image=None
+        )
 
         # Step 4: Convert answer back to speech
         audio_path = format_audio_response(answer, "general_question_answering")
 
         if audio_path:
             return JSONResponse(content={
-                "question": question,
-                "answer": answer,
-                "audio_path": audio_path,
-            })
+                "reply": answer,
+            }, status_code=200)  # Explicitly return 200 OK
         else:
             raise HTTPException(status_code=500, detail="Failed to generate audio response")
 

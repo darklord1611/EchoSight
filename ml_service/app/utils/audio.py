@@ -12,8 +12,8 @@ raw_feature_labels = OrderedDict({
         "headlines", "news report", "summary of article", "find", "give", "search", "look for", "locate", "seek", "discover", "identify"
     ],
     "Chatbot": [
-        "chat", "talk", "conversation", "ask", "question", "chatbot", "ask a question", 
-        "speak to", "let's talk", "chat with", "conversation with assistant"
+        "chat", "talk", "tell", "conversation", "ask", "question", "chatbot", "ask a question", 
+        "speak to", "let's talk", "chat with", "conversation with assistant", "what"
     ],
     "Text": [
         "text", "document", "page", "story", "paragraph", "content", 

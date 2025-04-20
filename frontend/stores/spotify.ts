@@ -1,4 +1,3 @@
-// src/stores/spotify.ts
 import { defineStore } from 'pinia';
 import axios from 'axios';
 
@@ -14,289 +13,147 @@ interface SpotifyTrack {
     duration_ms: number;
     explicit: boolean;
     popularity?: number;
+    uri: string;
 }
 
 export const useSpotifyStore = defineStore('spotify', {
     state: () => ({
-        accessToken: null as string | null,
-        refreshToken: null as string | null,
-        isPlaying: false,
+        accessToken: import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN || null,
+        refreshToken: import.meta.env.VITE_SPOTIFY_REFRESH_TOKEN || null,
         currentTrack: null as SpotifyTrack | null,
-        playbackPosition: 0,
-        playerReady: false,
+        isPlaying: false,
+        playbackPosition: 0,  // Added to track the current position in the track
     }),
 
     actions: {
-        async initializePlayerWithEnvTokens() {
-            // Get tokens directly from environment variables
-            this.accessToken = import.meta.env.VITE_SPOTIFY_ACCESS_TOKEN;
-            this.refreshToken = import.meta.env.VITE_SPOTIFY_REFRESH_TOKEN;
-
-            if (!this.accessToken || !this.refreshToken) {
-                console.error('Spotify tokens not found in environment variables');
-                return;
-            }
-
-
-            this.playerReady = true;
-            console.log('Spotify player initialized with env tokens');
-        },
-
-        async searchTracks(query: string) {
-            if (!this.accessToken) {
-
-                if (!this.accessToken) return [];
-            }
-
+        async detectMusic() {
+            this.isPlaying = false;
             try {
-                const response = await axios.get('https://api.spotify.com/v1/search', {
-                    params: {
-                        q: query,
-                        type: 'track',
-                        limit: 20
-                    },
-                    headers: {
-                        'Authorization': `Bearer ${this.accessToken}`
-                    }
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                const mediaRecorder = new MediaRecorder(stream);
+                const chunks: Blob[] = [];
+
+                const audioBlob: Blob = await new Promise((resolve, reject) => {
+                    mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
+
+                    mediaRecorder.onstop = () => {
+                        const blob = new Blob(chunks, { type: 'audio/webm' });
+                        resolve(blob);
+                    };
+
+                    mediaRecorder.onerror = reject;
+
+                    mediaRecorder.start();
+                    setTimeout(() => mediaRecorder.stop(), 10000); // 10 seconds
                 });
 
-                return response.data.tracks.items;
-            } catch (error) {
-                if (axios.isAxiosError(error) && error.response?.status === 401) {
+                const file = new File([audioBlob], 'recording.webm');
 
-                    // Try once more after token refresh
-                    return this.searchTracks(query);
+                const formData = new FormData();
+                formData.append("file", file);
+                formData.append("return", "spotify");
+                formData.append("api_token", import.meta.env.VITE_AUDD_API_KEY);
+
+                const response = await fetch("https://api.audd.io/", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const data = await response.json();
+                console.log("Audd.io Response:", data);
+
+                if (data?.result?.spotify?.uri) {
+                    const track = {
+                        id: data.result.spotify.id,
+                        name: data.result.title,
+                        artists: [{ name: data.result.artist }],
+                        album: {
+                            name: data.result.album,
+                            images: [{ url: data.result.spotify.album?.images?.[0]?.url || '' }],
+                            release_date: data.result.release_date || '',
+                        },
+                        duration_ms: data.result.spotify.duration_ms,
+                        explicit: data.result.spotify.explicit || false,
+                        popularity: data.result.spotify.popularity || 0,
+                        uri: data.result.spotify.uri
+                    };
+
+                    this.currentTrack = track;
+                    this.isPlaying = false;
+                    this.playbackPosition = 0; // Reset position
+                } else {
+                    alert("Could not recognize any song.");
                 }
-                console.error('Error searching Spotify:', error);
-                return [];
+            } catch (err) {
+                console.error("Microphone error:", err);
             }
         },
 
-        async playTrack(track: SpotifyTrack) {
+        async playMusic() {
+            if (!this.accessToken || !this.currentTrack) return;
 
             try {
-                // Start playback on Spotify
-                await axios.put('https://api.spotify.com/v1/me/player/play',
-                    { uris: [`spotify:track:${track.id}`] },
+                const deviceRes = await axios.get('https://api.spotify.com/v1/me/player/devices', {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                });
+
+                const device = deviceRes.data.devices.find((d: any) => d.is_active) || deviceRes.data.devices[0];
+                if (!device) {
+                    alert("No active Spotify devices found. Please open Spotify.");
+                    return;
+                }
+
+                await axios.put(`https://api.spotify.com/v1/me/player/play?device_id=${device.id}`,
+                    { uris: [this.currentTrack.uri] },
                     { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
                 );
 
-                this.currentTrack = track;
                 this.isPlaying = true;
-                this.playbackPosition = 0;
-
-                return
-
             } catch (error) {
-                if (axios.isAxiosError(error) && error.response?.status === 401) {
-
-                    // Try once more after token refresh
-                    return this.playTrack(track);
-                }
-                console.error('Error playing track:', error);
+                console.error("Error playing track:", error);
             }
         },
 
-        async pausePlayback() {
+        async pauseMusic() {
+            if (!this.accessToken) return;
 
             try {
                 await axios.put('https://api.spotify.com/v1/me/player/pause', {},
                     { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
                 );
-
                 this.isPlaying = false;
             } catch (error) {
-                console.error('Error pausing playback:', error);
+                console.error("Error pausing music:", error);
             }
         },
 
+        // New method to resume playback from the current position
         async resumePlayback() {
+            if (!this.accessToken || !this.currentTrack || !this.playbackPosition) return;
 
             try {
-                await axios.put('https://api.spotify.com/v1/me/player/play', {},
+                const deviceRes = await axios.get('https://api.spotify.com/v1/me/player/devices', {
+                    headers: { 'Authorization': `Bearer ${this.accessToken}` }
+                });
+
+                const device = deviceRes.data.devices.find((d: any) => d.is_active) || deviceRes.data.devices[0];
+                if (!device) {
+                    alert("No active Spotify devices found. Please open Spotify.");
+                    return;
+                }
+
+                await axios.put(`https://api.spotify.com/v1/me/player/play?device_id=${device.id}`,
+                    {
+                        uris: [this.currentTrack.uri],
+                        position_ms: this.playbackPosition // Start from the current position
+                    },
                     { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
                 );
 
                 this.isPlaying = true;
             } catch (error) {
-                console.error('Error resuming playback:', error);
-            }
-        },
-
-        async nextTrack() {
-
-            try {
-                await axios.post('https://api.spotify.com/v1/me/player/next', {},
-                    { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
-                );
-
-                // Get the now playing track
-                await this.getCurrentPlayback();
-            } catch (error) {
-                console.error('Error skipping to next track:', error);
-            }
-        },
-
-        async previousTrack() {
-
-            try {
-                await axios.post('https://api.spotify.com/v1/me/player/previous', {},
-                    { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
-                );
-
-                // Get the now playing track
-                await this.getCurrentPlayback();
-            } catch (error) {
-                console.error('Error going to previous track:', error);
-            }
-        },
-
-        async getCurrentPlayback() {
-
-            try {
-                const response = await axios.get('https://api.spotify.com/v1/me/player',
-                    { headers: { 'Authorization': `Bearer ${this.accessToken}` } }
-                );
-
-                if (response.data && response.data.item) {
-                    this.currentTrack = response.data.item;
-                    this.isPlaying = response.data.is_playing;
-                    this.playbackPosition = response.data.progress_ms;
-                }
-            } catch (error) {
-                console.error('Error getting current playback:', error);
-            }
-        },
-
-        async detectMusic() {
-            try {
-                // Step 1: Record 10 seconds of audio
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                const mediaRecorder = new MediaRecorder(stream);
-                const chunks: Blob[] = [];
-
-                mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-
-                mediaRecorder.onstop = async () => {
-                    const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-                    const file = new File([audioBlob], 'recording.webm');
-
-                    const formData = new FormData();
-                    formData.append("file", file);
-                    formData.append("return", "spotify");
-                    formData.append("api_token", import.meta.env.VITE_AUDD_API_KEY);
-
-                    try {
-                        const response = await fetch("https://api.audd.io/", {
-                            method: "POST",
-                            body: formData
-                        });
-
-                        const data = await response.json();
-                        console.log("Audd.io Response:", data);
-
-                        if (data?.result?.spotify?.uri) {
-                            const trackUri = data.result.spotify.uri;
-
-                            // Step 2: Make sure a device is available
-
-                            const devicesRes = await axios.get('https://api.spotify.com/v1/me/player/devices', {
-                                headers: {
-                                    'Authorization': `Bearer ${this.accessToken}`
-                                }
-                            });
-
-                            const devices = devicesRes.data.devices;
-                            if (!devices || devices.length === 0) {
-                                alert("No active Spotify devices found. Please open Spotify on a device.");
-                                return;
-                            }
-
-                            const activeDevice = devices.find((device: any) => device.is_active) || devices[0];
-
-                            this.currentTrack = {
-                                id: data.result.spotify.id,
-                                name: data.result.title,
-                                artists: [{ name: data.result.artist }],
-                                album: {
-                                    name: data.result.album,
-                                    images: [{ url: data.result.spotify.album?.images?.[0]?.url || '' }],
-                                    release_date: data.result.release_date || '',
-                                },
-                                duration_ms: data.result.spotify.duration_ms,
-                                explicit: data.result.spotify.explicit || false,
-                                popularity: data.result.spotify.popularity || 0,
-                            };
-                            this.isPlaying = true;
-                            this.playbackPosition = 0;
-
-                        } else {
-                            alert("Could not recognize any song.");
-                        }
-
-                    } catch (error) {
-                        console.error("Music recognition error:", error);
-                    }
-                };
-
-                mediaRecorder.start();
-                setTimeout(() => {
-                    mediaRecorder.stop();
-                }, 10000); // Record for 10 seconds
-
-            } catch (err) {
-                console.error("Microphone error:", err);
+                console.error("Error resuming track:", error);
             }
         }
     }
 });
-
-
-
-// const detectMusic = async () => {
-//     try {
-//         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-//         const mediaRecorder = new MediaRecorder(stream);
-//         const chunks: Blob[] = [];
-
-//         mediaRecorder.ondataavailable = (e) => chunks.push(e.data);
-
-//         mediaRecorder.onstop = async () => {
-//             const audioBlob = new Blob(chunks, { type: 'audio/webm' });
-//             const file = new File([audioBlob], 'recording.webm');
-
-//             const formData = new FormData();
-//             formData.append("file", file);
-//             formData.append("return", "spotify");
-//             formData.append("api_token", import.meta.env.VITE_AUDD_API_KEY);
-
-//             try {
-//                 const response = await fetch("https://api.audd.io/", {
-//                     method: "POST",
-//                     body: formData
-//                 });
-
-//                 const data = await response.json();
-//                 console.log("Audd.io Response:", data);
-
-//                 if (data?.result?.spotify?.external_urls?.spotify) {
-//                     if (data?.result?.spotify?.uri) {
-//                         await activateAndPlay(data.result.spotify.uri);
-//                     }
-//                 } else {
-//                     alert("Could not recognize any song.");
-//                 }
-//             } catch (error) {
-//                 console.error("Music recognition error:", error);
-//             }
-//         };
-
-//         mediaRecorder.start();
-
-//         setTimeout(() => {
-//             mediaRecorder.stop();
-//         }, 10000); // Record for 10 seconds
-//     } catch (err) {
-//         console.error("Microphone error:", err);
-//     }
-// };

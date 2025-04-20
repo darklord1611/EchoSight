@@ -1,9 +1,9 @@
 <template>
   <div class="voice-command-container">
     <VoiceVisualizer :isRecording="isRecording" :decibelLevel="decibelLevel" />
-    <div v-if="feedback" class="voice-feedback mt-2 text-sm">
+    <!-- <div v-if="feedback" class="voice-feedback mt-2 text-sm">
       {{ feedback }}
-    </div>
+    </div> -->
     <div v-if="props.selectedFeature" class="available-commands mt-2 text-xs opacity-70">
       <div>Available commands: {{ getAvailableCommands() }}</div>
     </div>
@@ -16,10 +16,10 @@ import { useNuxtApp } from '#app';
 import VoiceVisualizer from './VoiceVisualizer.vue';
 import { useSpotifyStore } from '@/stores/spotify';
 import { useNewsStore } from '@/stores/news';
+import { useChatbotStore } from '@/stores/chatbot'
 
-import { MicVAD } from "@ricky0123/vad-web";
 
-let vad: MicVAD | null = null;
+const chatbotStore = useChatbotStore()
 
 const newsStore = useNewsStore();
 const emit = defineEmits(['featureMatched']);
@@ -126,83 +126,6 @@ const getAvailableCommands = () => {
 };
 
 
-const startRecordingV2 = async () => {
-  console.log("Starting VAD...");
-  if (isRecording.value) return;
-
-  try {
-    vad = await MicVAD.new({
-      onSpeechStart: () => {
-        console.log('🗣 Speech started');
-      },
-      onSpeechEnd: async (audio: Float32Array) => {
-        console.log('🛑 Speech ended');
-        isRecording.value = false;
-
-        if (!speechDetected) {
-          console.log('❌ No significant speech detected. Skipping request.');
-          return;
-        }
-
-        // Convert Float32Array to Blob
-        const blob = new Blob([audio.buffer], { type: 'audio/webm' });
-        // Process the audio for commands
-        const data = await $sendAudioForCommand(props.selectedFeature, blob);
-
-
-        const commandText = data.command;
-
-        // if the current feature matched the command then it is a query of the feature
-        if (props.selectedFeature === data.command && data.intent === "query") {
-          if (props.selectedFeature === "News") {
-            showFeedback("Fetching required articles...")
-            newsStore.fetchNews(data.query);
-            return
-          } else if (props.selectedFeature === "Chatbot") {
-            showFeedback("Fetching required response...")
-            return;
-          }
-        }
-
-        if (!commandText) {
-          showFeedback("Sorry, I didn't understand that.");
-          return;
-        }
-
-        const lowerCommand = commandText.toLowerCase();
-        console.log('Voice command recognized:', lowerCommand);
-
-
-        // Check if command is a feature selection
-        const featureMatch = Object.keys(featureCommands).find(
-          feature => feature.toLowerCase() === lowerCommand
-        );
-
-        console.log('Feature match:', featureMatch);
-        console.log('Selected feature:', props.selectedFeature);
-        console.log("cameraRef:", props.cameraRef);
-
-        if (featureMatch) {
-          // User is selecting a feature
-          showFeedback(`Switched to ${featureMatch} mode`);
-          emit('featureMatched', featureMatch);
-        }
-        else if (props.selectedFeature) {
-          // User is using a feature specific command
-          await handleFeatureCommand(lowerCommand);
-        }
-        else {
-          // No feature selected yet
-          showFeedback(`Please select a feature first. Say one of: ${Object.keys(featureCommands).join(', ')}`);
-        }
-      }
-    });
-  } catch (error) {
-    console.error('Error starting VAD:', error);
-    showFeedback('Unable to access microphone. Please check permissions.');
-  }
-};
-
 //////////////// ARTICLE_SECTION //////////////////////
 
 const ordinalMap: Record<string, number> = {
@@ -279,7 +202,7 @@ const startRecording = async () => {
 
     // Track audio levels for visualization and speech detection
     const trackDecibels = () => {
-      if (!analyser || !isRecording.value || speechSynthesis.speaking) return;
+      if (!analyser || !isRecording.value) return;
 
       analyser.getByteTimeDomainData(dataArray);
       let sum = 0;
@@ -313,11 +236,13 @@ const startRecording = async () => {
       // Don't process if we manually stopped recording for music detection
       if (!isRecording.value) {
         console.log('Recording stopped manually. Skipping processing.');
+        resetSpeechFlags();
         return;
       }
 
       if(speechSynthesis.speaking) {
-        console.log('🛑 Speech synthesis is active. Skipping processing.');
+        console.log('Feedback is being spoken. Skipping request.');
+        resetSpeechFlags();
         return;
       }
 
@@ -359,6 +284,15 @@ const startRecording = async () => {
           showFeedback("Fetching required articles...");
           await newsStore.fetchNews(data.query);
           showFeedback("Articles updated.");
+          return;
+        }
+      }
+
+      if (props.selectedFeature === data.command && data.command === "Chatbot") {
+        if (data.intent == "query") {
+          console.log("Chatbot query detected:", data.query);
+          const reply = await chatbotStore.sendMessage(data.query);
+          showFeedback(`${reply}`);
           return;
         }
       }
@@ -460,7 +394,7 @@ const executeGlobalCommand = async (action: string) => {
       showFeedback('Stopping all audio...');
       speechSynthesis.cancel();
       if (spotifyStore.isPlaying) {
-        spotifyStore.togglePlayback();
+        spotifyStore.pauseMusic();
       }
       break;
 
@@ -481,7 +415,7 @@ const executeGlobalCommand = async (action: string) => {
 
 // Execute the matched command
 const executeCommand = async (feature: string, action: string, originalCommand: string) => {
-  showFeedback(`Executing: ${action} for ${feature}`);
+  // showFeedback(`Executing: ${action} for ${feature}`);
 
   console.log(`Executing command: ${action} for feature: ${feature}`);
 
@@ -512,14 +446,14 @@ const executeCommand = async (feature: string, action: string, originalCommand: 
 const executeMusicCommand = async (action: string) => {
   switch (action) {
     case 'detect':
-      showFeedback('Detecting music...');
+      showFeedback('Detecting music');
 
       // Stop the microphone before music detection
       stopRecording();
 
       try {
         await spotifyStore.detectMusic();
-        showFeedback('Music detection complete.');
+        console.log("Music detected:", spotifyStore.currentTrack);
       } catch (error) {
         showFeedback('Failed to detect music. Please try again.');
         console.error('Music detection error:', error);
@@ -532,7 +466,7 @@ const executeMusicCommand = async (action: string) => {
     case 'play':
       showFeedback('Playing music');
       if (spotifyStore.currentTrack) {
-        spotifyStore.togglePlayback();
+        spotifyStore.playMusic();
       } else {
         speak('No music is currently loaded.');
       }
@@ -541,7 +475,7 @@ const executeMusicCommand = async (action: string) => {
     case 'pause':
       showFeedback('Pausing music');
       if (spotifyStore.isPlaying) {
-        spotifyStore.togglePlayback();
+        spotifyStore.pauseMusic();
       } else {
         speak('Music is already paused.');
       }
@@ -549,17 +483,15 @@ const executeMusicCommand = async (action: string) => {
   }
 };
 
-// Function stubs for other feature commands
 const executeCameraCommand = async (action: string) => {
-  console.log("Taking a snapshot with current feature:", action);
+  console.log("Taking a snapshot with current feature:", action)
   if (props.cameraRef) {
-    props.cameraRef.takeSnapshot();
-    showFeedback(`Capturing snapshot for ${action}...`);
+    await props.cameraRef.takeSnapshot() // Assume this returns the image blob
+    showFeedback(`Capturing snapshot for ${action}...`)
   } else {
-    showFeedback(`Camera not ready.`);
+    showFeedback(`Camera not ready.`)
   }
-  return;
-};
+}
 
 const executeChatbotCommand = async (action: string) => {
   speak(`Executing ${action} for chatbot feature`);
@@ -572,19 +504,13 @@ const executeNewsCommand = async (action: string) => {
 };
 
 // Display feedback and speak it
-const showFeedback = async (message: string, delayAfter: number = 1000) => {
+const showFeedback = async (message: string, delayAfter: number = 500) => {
   feedback.value = message;
 
-  // Stop listening before speaking
-  if (isRecording.value) {
-    stopRecording();
-  }
+  console.log('Feedback:', message);
 
   await speak(message);
   await sleep(delayAfter);
-
-  // Restart listening after speaking
-  startRecording();
 
   if (feedbackTimeout) clearTimeout(feedbackTimeout);
   feedbackTimeout = setTimeout(() => {

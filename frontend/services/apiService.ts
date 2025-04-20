@@ -1,7 +1,17 @@
-import { v4 as uuidv4 } from 'uuid';
+// REMOVE speechSynthesis calls and just return the message for VoiceCommand to handle
+import { v4 as uuidv4 } from 'uuid'
+import axios from 'axios'
+
+const speak = (text: string): Promise<void> => {
+    return new Promise(resolve => {
+        const utterance = new SpeechSynthesisUtterance(text)
+        utterance.onend = () => resolve()
+        speechSynthesis.speak(utterance)
+    })
+}
 
 export function useApiService() {
-    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL;
+    const BACKEND_URL = import.meta.env.VITE_BACKEND_URL
 
     const endpoints: Record<string, string> = {
         'Text': '/document_recognition',
@@ -11,55 +21,39 @@ export function useApiService() {
         'Distance': '/distance_estimate',
         'Face': '/face_detection/recognize',
         'Music': '/',
-    };
-
-    const speakText = (text: string) => {
-        const utterance = new SpeechSynthesisUtterance(text);
-        utterance.lang = 'en-US'; // You can customize this
-        speechSynthesis.speak(utterance);
-    };
+    }
 
     const processImage = async (blob: Blob, buttonName: string) => {
-        const endpoint = endpoints[buttonName];
-        if (!endpoint) return;
+        const endpoint = endpoints[buttonName]
+        if (!endpoint) return null
 
-        const fullUrl = `${BACKEND_URL}${endpoint}`;
-        const id = uuidv4();
-        const filename = `snapshot-${id}.jpg`;
-        const file = new File([blob], filename, { type: "image/jpeg" });
+        const fullUrl = `${BACKEND_URL}${endpoint}`
+        const id = uuidv4()
+        const filename = `snapshot-${id}.jpg`
+        const file = new File([blob], filename, { type: 'image/jpeg' })
 
-        const formData = new FormData();
-        formData.append('file', file);
+        const formData = new FormData()
+        formData.append('file', file)
 
         try {
-            const response = await fetch(fullUrl, {
-                method: 'POST',
-                body: formData,
+            const { data } = await axios.post(fullUrl, formData, {
                 headers: {
-                    'Accept': 'application/json'
+                    'Accept': 'application/json',
+                    'Content-Type': 'multipart/form-data',
                 }
-            });
+            })
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
+            console.log(data)
+            speak(data.text)
 
-            const jsonResponse = await response.json();
-            console.log('JSON Response:', jsonResponse);
-
-            // 👇 Use speech synthesis to speak the text
-            const textToSpeak = jsonResponse?.text || jsonResponse?.description || jsonResponse?.result || 'No description available.';
-            speakText(textToSpeak);
-
-            return jsonResponse;
+            return data
         } catch (error) {
-            console.error('Error sending image to endpoint:', error);
-            speakText("Sorry, something went wrong processing the image.");
-            return null;
+            console.error('Axios error:', error)
+            return { data: null, textToSpeak: 'Sorry, something went wrong processing the image.' }
         }
-    };
+    }
 
     return {
         processImage
-    };
+    }
 }

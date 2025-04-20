@@ -39,10 +39,6 @@
   
   // Methods
   const takeSnapshot = async () => {
-    if (props.featureType === 'Music') {
-      await spotifyStore.detectMusic();
-      return;
-    }
   
     const blob = await cameraRef.value?.snapshot();
     if (blob) {
