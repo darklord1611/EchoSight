@@ -12,9 +12,13 @@ const clientId = process.env.SPOTIFY_CLIENT_ID;
 const clientSecret = process.env.SPOTIFY_CLIENT_SECRET;
 const redirectUri = 'https://8888-01jqra6238a6wpepek4ygtdb3f.cloudspaces.litng.ai/callback';
 const scopes = [
-    'streaming',
-    'user-read-email',
-    'user-read-private',
+    "streaming",
+    "user-read-email",
+    "user-read-private",
+    "user-modify-playback-state",
+    "user-read-playback-state",
+    "user-read-currently-playing",
+    "app-remote-control"
 ].join(' ');
 
 const app = express();

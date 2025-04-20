@@ -26,7 +26,7 @@ def transcribe_audio(audio_file_path):
 
         with open(audio_file_path, "rb") as f:
             response = requests.post(
-                "https://api.deepgram.com/v1/listen?punctuate=true&language=en-US",
+                "https://api.deepgram.com/v1/listen?model=enhanced-phonecall",
                 headers=headers,
                 data=f
             )
