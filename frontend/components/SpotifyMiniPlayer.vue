@@ -1,9 +1,9 @@
 <template>
-  <div class="fixed bottom-0 left-0 right-0 bg-gradient-to-r from-green-900 to-green-700 text-white shadow-lg z-10 rounded-t-lg">
+  <div class="fixed bottom-16 left-0 right-0 bg-gradient-to-r from-green-900 to-green-700 text-white shadow-lg z-10 rounded-t-lg">
     <div class="container mx-auto">
-      <div class="p-3">
+      <div class="p-4">
         <!-- Track info with progress bar -->
-        <div class="flex items-center mb-2">
+        <div class="flex items-center mb-3">
           <img 
             v-if="spotifyStore.currentTrack?.album?.images?.[1]?.url" 
             :src="spotifyStore.currentTrack.album.images[1].url" 
@@ -13,17 +13,17 @@
           <div class="flex-grow">
             <div class="flex justify-between items-center">
               <div>
-                <div class="font-bold text-lg">{{ spotifyStore.currentTrack?.name }}</div>
-                <div class="text-sm opacity-90">{{ spotifyStore.currentTrack?.artists.map(a => a.name).join(', ') }}</div>
-                <div class="text-xs opacity-80 mt-1">{{ spotifyStore.currentTrack?.album?.name }}</div>
+                <div class="font-bold text-lg" aria-label="Track name">{{ spotifyStore.currentTrack?.name }}</div>
+                <div class="text-sm opacity-90" aria-label="Artists">{{ spotifyStore.currentTrack?.artists.map(a => a.name).join(', ') }}</div>
+                <div class="text-xs opacity-80 mt-1" aria-label="Album name">{{ spotifyStore.currentTrack?.album?.name }}</div>
               </div>
-              <div class="text-xs opacity-80">
+              <div class="text-xs opacity-80" aria-label="Playback time">
                 {{ formatTime(playbackPosition) }} / {{ formatTime(spotifyStore.currentTrack?.duration_ms) }}
               </div>
             </div>
             
             <!-- Progress bar -->
-            <div class="w-full bg-gray-600 rounded-full h-1.5 mt-2">
+            <div class="w-full bg-gray-600 rounded-full h-1.5 mt-2" aria-label="Playback progress">
               <div 
                 class="bg-green-400 h-1.5 rounded-full" 
                 :style="{ width: `${(playbackPosition / spotifyStore.currentTrack?.duration_ms) * 100}%` }"
@@ -35,8 +35,12 @@
         <!-- Controls -->
         <div class="flex justify-center items-center space-x-6">
           <!-- Previous button -->
-          <button class="text-white hover:text-green-300 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button 
+            @click="spotifyStore.previousTrack" 
+            class="text-white hover:text-green-300 transition-colors" 
+            aria-label="Previous track"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="19 20 9 12 19 4 19 20"></polygon>
               <line x1="5" y1="19" x2="5" y2="5"></line>
             </svg>
@@ -45,20 +49,25 @@
           <!-- Play/Pause button -->
           <button 
             @click="togglePlayback()" 
-            class="bg-white text-green-800 rounded-full p-3 hover:bg-green-100 transition-colors"
+            class="bg-white text-green-800 rounded-full p-3 hover:bg-green-100 transition-colors" 
+            aria-label="Play or pause"
           >
-            <svg v-if="spotifyStore.isPlaying" xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-if="spotifyStore.isPlaying" xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <rect x="6" y="4" width="4" height="16"></rect>
               <rect x="14" y="4" width="4" height="16"></rect>
             </svg>
-            <svg v-else xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <svg v-else xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="5 3 19 12 5 21 5 3"></polygon>
             </svg>
           </button>
           
           <!-- Next button -->
-          <button class="text-white hover:text-green-300 transition-colors">
-            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <button 
+            @click="spotifyStore.nextTrack" 
+            class="text-white hover:text-green-300 transition-colors" 
+            aria-label="Next track"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <polygon points="5 4 15 12 5 20 5 4"></polygon>
               <line x1="19" y1="5" x2="19" y2="19"></line>
             </svg>

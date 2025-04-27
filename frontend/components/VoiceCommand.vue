@@ -1,11 +1,29 @@
 <template>
-  <div class="voice-command-container">
+  <div class="voice-command-container bg-white rounded-xl shadow-md p-4 w-full max-w-md">
+    <!-- Visualizer -->
     <VoiceVisualizer :isRecording="isRecording" :decibelLevel="decibelLevel" />
-    <!-- <div v-if="feedback" class="voice-feedback mt-2 text-sm">
-      {{ feedback }}
-    </div> -->
-    <div v-if="props.selectedFeature" class="available-commands mt-2 text-xs opacity-70">
-      <div>Available commands: {{ getAvailableCommands() }}</div>
+
+    <!-- User's voice input -->
+    <div 
+      v-if="lastTranscript" 
+      class="mt-3 p-2 bg-gray-50 rounded-lg border border-gray-100"
+    >
+      <p class="text-sm text-gray-600">
+        <span class="font-medium">You said:</span> "{{ lastTranscript }}"
+      </p>
+    </div>
+
+    <!-- Feedback message -->
+    <div 
+      v-if="feedback" 
+      class="mt-3 p-2 rounded-lg flex items-center space-x-2"
+      :class="feedbackType === 'success' ? 'bg-green-50 text-green-700' : feedbackType === 'error' ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'"
+    >
+      <i 
+        :class="feedbackType === 'success' ? 'fas fa-check-circle' : feedbackType === 'error' ? 'fas fa-times-circle' : 'fas fa-info-circle'"
+        class="text-sm"
+      ></i>
+      <p class="text-sm">{{ feedback }}</p>
     </div>
   </div>
 </template>
@@ -35,6 +53,8 @@ const props = defineProps<{
 const isRecording = ref(false);
 const decibelLevel = ref(0);
 const feedback = ref<string | null>(null);
+const lastTranscript = ref<string | null>(null);
+
 let mediaRecorder: MediaRecorder | null = null;
 let audioChunks: Blob[] = [];
 let audioContext: AudioContext | null = null;
@@ -258,6 +278,8 @@ const startRecording = async () => {
 
 
       const commandText = data.command;
+
+      lastTranscript.value = data.query;
 
       if (data.query === "") {
         console.log("Nothing to record")
@@ -569,19 +591,7 @@ onUnmounted(() => {
 
 <style scoped>
 .voice-command-container {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.voice-feedback {
-  text-align: center;
-  color: var(--color-text-primary);
-}
-
-.available-commands {
-  text-align: center;
-  color: var(--color-text-secondary);
-  font-style: italic;
+  border-radius: 12px;
+  transition: all 0.3s ease;
 }
 </style>
