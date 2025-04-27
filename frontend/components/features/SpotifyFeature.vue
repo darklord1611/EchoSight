@@ -1,7 +1,6 @@
-<!-- src/components/features/SpotifyFeature.vue -->
 <template>
   <div class="flex flex-col items-center w-full max-w-2xl px-4">
-    <div class="w-full bg-gradient-to-br from-green-900 via-green-800 to-green-700 rounded-xl shadow-xl overflow-hidden">
+    <div class="w-full bg-gradient-to-br from-green-900 via-green-800 to-green-700 rounded-xl shadow-lg overflow-hidden">
       <!-- Header -->
       <div class="p-6 text-white text-center border-b border-green-600">
         <div class="flex items-center justify-center mb-2">

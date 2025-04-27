@@ -146,7 +146,9 @@ def execute_pipeline(user_query: str, provider="openai"):
     # # Step 5: TTS (optional)
     # # speak_text(summary)
 
-    return articles
+    max_articles = 3
+
+    return articles[:max_articles]
 
 
 # ---- MAIN ----
