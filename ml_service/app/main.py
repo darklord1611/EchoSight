@@ -142,7 +142,7 @@ async def product_recognition(file: UploadFile = File(...)):
         base64_image = base64.b64encode(image_data).decode("utf-8")
 
         result = get_llm_response(
-            query="Extract text from this image.",
+            query="Extract product information from this image.",
             task="product_recognition",
             base64_image=base64_image,
         )
@@ -181,6 +181,31 @@ async def calculate_distance(transcribe: str,file: UploadFile = File(...)):
     return JSONResponse(content={
         "description" : results
     })
+
+@app.post("/distance_estimate_v2")
+async def distance_estimate(file: UploadFile = File(...)):
+    try:
+        start = time.time()
+        image_data = await file.read()
+        base64_image = base64.b64encode(image_data).decode("utf-8")
+
+        result = get_llm_response(
+            query="Extract navigational information from this image.",
+            task="distance_estimation",
+            base64_image=base64_image,
+        )
+
+        if not result:
+            raise HTTPException(status_code=500, detail="Failed to generate text response")
+
+        return JSONResponse(content={
+            "status": "success",
+            "text": result,
+        })
+
+    except Exception as e:
+        print(f"Lỗi xảy ra: {e}")
+        raise HTTPException(status_code=500, detail="Internal server error")
 
 
 collection = connect_mongodb()

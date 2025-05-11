@@ -131,7 +131,7 @@ def execute_pipeline(user_query: str, provider="openai"):
     # refined_query = refine_query(llm, user_query)
     # print(f"🎯 Refined Query:\n{refined_query}\n")
 
-    refined_query = user_query + "news report articles"
+    refined_query = user_query
 
     # Step 2: Search with SerpAPI
     urls = serpapi_search(refined_query)

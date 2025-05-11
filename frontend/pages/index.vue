@@ -1,5 +1,5 @@
 <template>
-  <div class="flex flex-col h-screen bg-gradient-to-br from-blue-100 via-white to-green-100">
+  <div class="flex flex-col min-h-screen bg-gradient-to-br from-blue-100 via-white to-green-100">
     <NavBar />
 
     <!-- Main Content: Vertical Button Bar + Feature Components -->
@@ -9,42 +9,48 @@
         <ButtonBar :selectedFeature="selectedFeature" @update:selectedFeature="updateSelectedFeature" />
       </div>
 
-      <!-- Feature Area -->
-      <div class="flex flex-1 flex-col justify-center items-center space-y-6">
-        <!-- Camera Feature -->
-        <CameraFeature
-          v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)"
-          ref="cameraFeatureRef"
-          :featureType="selectedFeature"
-          @take-snapshot="handleSnapshot"
-        />
+      <!-- Feature Display Area (Right Side) -->
+      <div class="flex flex-1 flex-col p-4">
+        <!-- Feature Content -->
+        <div class="flex-grow space-y-4 mb-4 pr-2">
+          <!-- Camera Feature -->
+          <div class="flex justify-center w-full">
+            <CameraFeature v-if="['Text', 'Currency', 'Object', 'Distance', 'Product'].includes(selectedFeature)"
+              ref="cameraFeatureRef" :featureType="selectedFeature" @take-snapshot="handleSnapshot" />
+          </div>
 
-        <!-- Response from camera -->
-        <div v-if="cameraResponseText" class="bg-green-100 rounded-lg p-4 shadow-md max-w-xl text-center">
-          <p class="text-green-800 font-medium">{{ cameraResponseText }}</p>
+          <!-- Response from camera -->
+          <div v-if="cameraResponseText"
+            class="bg-green-100 rounded-lg mx-auto p-4 shadow-md max-w-xl text-center max-h-60 overflow-y-auto"
+            ref="responseElement">
+            <p class="text-green-800 font-medium">{{ cameraResponseText }}</p>
+          </div>
+
+          <!-- Other Features -->
+          <div class="flex justify-center w-full">
+            <SpotifyFeature v-if="selectedFeature === 'Music'" />
+          </div>
+          
+          <div class="flex justify-center w-full">
+            <NewsFeature v-if="selectedFeature === 'News'" />
+          </div>
+          
+          <div class="flex justify-center w-full">
+            <ChatFeature v-if="selectedFeature === 'Chatbot'" />
+          </div>
         </div>
 
-        <!-- Other Features -->
-        <SpotifyFeature v-if="selectedFeature === 'Music'" />
-        <NewsFeature v-if="selectedFeature === 'News'" />
-        <ChatFeature v-if="selectedFeature === 'Chatbot'" />
-
-        <!-- Voice Command and Visualizer -->
-        <div class="flex flex-col items-center w-full max-w-md">
-          <VoiceCommand
-            :selectedFeature="selectedFeature"
-            :cameraRef="cameraFeatureRef"
-            @featureMatched="updateSelectedFeature"
-          />
+        <!-- Voice Command and Visualizer (Fixed at bottom) -->
+        <div class="flex flex-col items-center w-full max-w-md mx-auto">
+          <VoiceCommand :selectedFeature="selectedFeature" :cameraRef="cameraFeatureRef"
+            @featureMatched="updateSelectedFeature" />
         </div>
       </div>
     </div>
 
     <!-- Spotify Mini Player -->
-    <SpotifyMiniPlayer
-      v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
-      @open-spotify-feature="openSpotifyFeature"
-    />
+    <SpotifyMiniPlayer v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
+      @open-spotify-feature="openSpotifyFeature" />
 
     <!-- Modals -->
     <SettingsModal :show="isSettingsModalOpen" @close="isSettingsModalOpen = false" />
@@ -77,6 +83,7 @@ const selectedFeature = ref<string>('Text');
 const isSettingsModalOpen = ref<boolean>(false);
 const isAboutModalOpen = ref<boolean>(false);
 const cameraResponseText = ref<string>('');
+const responseElement = ref<HTMLElement | null>(null);
 
 // Stores
 const spotifyStore = useSpotifyStore();
@@ -100,6 +107,20 @@ const handleSnapshot = async (blob: Blob) => {
     }
   }
 };
+
+// Auto-scroll to the response when it appears
+watch(cameraResponseText, async (newValue) => {
+  if (newValue) {
+    // Wait for DOM update to ensure element is rendered
+    await nextTick();
+    if (responseElement.value) {
+      responseElement.value.scrollIntoView({
+        behavior: 'smooth',
+        block: 'nearest'
+      });
+    }
+  }
+});
 
 const openSpotifyFeature = () => {
   selectedFeature.value = 'Music';

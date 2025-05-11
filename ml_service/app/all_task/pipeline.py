@@ -55,19 +55,25 @@ Output:
 """
 
 NAVIGATION_ASSISTANCE_PROMPT = """
-You are an assistant helping a blind person navigate toward a specific object or location using a photo taken from their perspective.
+You are assisting a blind person with real-time navigation. Based on the following sensor data, generate a clear and concise spoken message that guides the user safely through their environment. Use calm and friendly language.
 
-Your goals:
-- Describe the surrounding environment clearly and briefly.
-- Identify objects or landmarks that might help guide the user (e.g., doors, signs, chairs, people, crosswalks).
-- If possible, explain where the target object or location is located (e.g., "the red door is directly ahead", "the exit sign is to the left").
-- Use simple directional language (left, right, straight ahead, near, far).
-- Do not refer to anything the user wouldn't be able to interpret through guidance (avoid "as seen in the top-right").
+Sensor Data:
 
-Output format:
-Direction: ...
-Key Landmark(s): ...
-Suggested Action: ...
+Obstacles and landmarks: [list with object type, approximate distance, and direction, e.g., "a trash can is 3 feet ahead to the left"]
+
+Path info: [description of walkable path, e.g., "clear path continues forward for 10 feet"]
+
+Actions needed: [any important immediate advice, e.g., "step slightly right", "stop and wait"]
+
+Format the output as a single paragraph intended for audio transcription. Avoid technical jargon. Prioritize clarity and safety.
+
+Example input:
+Obstacles: A trash can 3 feet ahead to the left, a bench 5 feet ahead on the right.
+Path info: Clear forward path for 10 feet.
+Action: Step slightly to the right.
+
+Expected output:
+“There’s a trash can a few feet ahead on your left and a bench on the right. The path is clear straight ahead for about ten feet. Please step slightly to your right to stay clear of the obstacles.”
 """
 
 
@@ -97,6 +103,7 @@ def get_task_prompt(task: str) -> str:
         "image_captioning": IMAGE_CAPTIONING_PROMPT,
         "product_recognition": PRODUCT_RECOGNITION_PROMPT,
         "currency_detection": CURRENCY_DETECTION_PROMPT,
+        "distance_estimation": NAVIGATION_ASSISTANCE_PROMPT,
     }
     return prompts.get(task, "Describe the image.")
 

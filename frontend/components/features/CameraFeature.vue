@@ -1,7 +1,9 @@
 <template>
   <div class="flex flex-col items-center space-y-6">
     <!-- Camera Container -->
-    <div class="w-full max-w-[640px] h-auto aspect-video rounded-lg overflow-hidden shadow-lg bg-black">
+    <div 
+      class="w-[320px] h-[240px] rounded-lg overflow-hidden shadow-lg bg-black"
+    >
       <Camera 
         :resolution="cameraResolution" 
         ref="cameraRef" 
@@ -24,7 +26,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, defineProps, defineEmits } from 'vue';
+import { ref, defineProps, defineEmits } from 'vue';
 import Camera from 'simple-vue-camera';
 
 const props = defineProps({
@@ -38,7 +40,7 @@ const emit = defineEmits(['take-snapshot']);
 
 // Refs
 const cameraRef = ref<InstanceType<typeof Camera>>();
-const cameraResolution = ref({ width: 640, height: 360 });
+const cameraResolution = ref({ width: 320, height: 240 }); // Fixed resolution for laptop screens
 
 // Methods
 const takeSnapshot = async () => {
@@ -47,28 +49,6 @@ const takeSnapshot = async () => {
     emit('take-snapshot', blob);
   }
 };
-
-const updateCameraResolution = () => {
-  if (window.innerWidth > 1024) {
-    cameraResolution.value = { width: 1280, height: 720 }; // Desktop resolution
-  } else if (window.innerWidth > 768) {
-    cameraResolution.value = { width: 1024, height: 576 }; // Laptop resolution
-  } else if (window.innerWidth > 480) {
-    cameraResolution.value = { width: 960, height: 540 }; // Tablet resolution
-  } else {
-    cameraResolution.value = { width: 720, height: 405 }; // Mobile resolution
-  }
-};
-
-// Lifecycle hooks
-onMounted(() => {
-  updateCameraResolution();
-  window.addEventListener('resize', updateCameraResolution);
-});
-
-onUnmounted(() => {
-  window.removeEventListener('resize', updateCameraResolution);
-});
 
 // Expose snapshot method to parent
 defineExpose({
@@ -80,10 +60,6 @@ defineExpose({
 /* Camera container styles */
 .bg-black {
   background-color: #000;
-}
-
-.aspect-video {
-  aspect-ratio: 16 / 9;
 }
 
 .shadow-lg {

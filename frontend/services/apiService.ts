@@ -18,7 +18,7 @@ export function useApiService() {
         'Currency': '/currency_detection',
         'Object': '/image_captioning',
         'Product': '/product_recognition',
-        'Distance': '/distance_estimate',
+        'Distance': '/distance_estimate_v2',
         'Face': '/face_detection/recognize',
         'Music': '/',
     }

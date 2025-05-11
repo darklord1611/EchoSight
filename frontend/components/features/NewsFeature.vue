@@ -64,7 +64,7 @@ defineExpose({
   </div>
 
   <!-- News Results -->
-  <div class="overflow-y-auto max-h-[calc(100vh-200px)]">
+  <div>
     <div v-if="loading" class="text-center text-gray-500">Loading news...</div>
     <div v-else-if="error" class="text-center text-red-500">{{ error }}</div>
     <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
