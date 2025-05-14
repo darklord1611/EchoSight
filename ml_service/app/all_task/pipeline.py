@@ -55,25 +55,24 @@ Output:
 """
 
 NAVIGATION_ASSISTANCE_PROMPT = """
-You are assisting a blind person with real-time navigation. Based on the following sensor data, generate a clear and concise spoken message that guides the user safely through their environment. Use calm and friendly language.
+You are assisting a blind person with real-time navigation. Based on the following image analysis data, generate a clear and concise spoken message that estimates the distance to visible objects and helps the user navigate safely. Use calm, supportive, and friendly language.
 
-Sensor Data:
+Image Analysis Data:
 
-Obstacles and landmarks: [list with object type, approximate distance, and direction, e.g., "a trash can is 3 feet ahead to the left"]
+- Detected Objects: [List of objects detected in the camera feed, along with their estimated distances from the camera and relative direction. Example: "a chair is approximately 2 feet ahead to the right", "a person is 6 feet to your left"]
+- Path Description: [Information about the walkable or obstructed path in front of the user. Example: "The area straight ahead is mostly clear for 8 feet"]
+- Suggested Action: [Recommended movement or caution based on detected obstacles. Example: "slow down and veer left", "you can continue straight for now"]
 
-Path info: [description of walkable path, e.g., "clear path continues forward for 10 feet"]
-
-Actions needed: [any important immediate advice, e.g., "step slightly right", "stop and wait"]
-
-Format the output as a single paragraph intended for audio transcription. Avoid technical jargon. Prioritize clarity and safety.
+Format the output as a single spoken paragraph intended for audio transcription. Avoid technical or visual terms. Emphasize clarity, safety, and spatial awareness using natural, descriptive language.
 
 Example input:
-Obstacles: A trash can 3 feet ahead to the left, a bench 5 feet ahead on the right.
-Path info: Clear forward path for 10 feet.
-Action: Step slightly to the right.
+Detected Objects: A chair is 2 feet ahead to the right, a person is 6 feet to your left.
+Path Description: Clear ahead for 8 feet.
+Suggested Action: Move slightly to the left.
 
 Expected output:
-“There’s a trash can a few feet ahead on your left and a bench on the right. The path is clear straight ahead for about ten feet. Please step slightly to your right to stay clear of the obstacles.”
+“There’s a chair about two feet ahead on your right and a person a bit farther off to your left. You’ve got a clear path straight ahead for about eight feet. Move slightly to your left to avoid the chair.”
+
 """
 
 
@@ -109,11 +108,81 @@ def get_task_prompt(task: str) -> str:
 
 from typing import Optional
 
+
+import cv2
+from pyzbar.pyzbar import decode
+import numpy as np
+
+def extract_barcode_from_base64(base64_image: str):
+    image_bytes = base64.b64decode(base64_image)
+    image_np = np.frombuffer(image_bytes, dtype=np.uint8)
+    image = cv2.imdecode(image_np, cv2.IMREAD_COLOR)
+    
+    decoded_objects = decode(image)
+    barcodes = [obj.data.decode("utf-8") for obj in decoded_objects]
+
+    print(barcodes)
+    
+    return barcodes  # could be a list of barcodes found
+
+import requests
+import json
+
+def fetch_book_main_info(isbn: str) -> Optional[dict]:
+    """
+    Fetch and return only the main book information from Google Books API using ISBN.
+    """
+    url = f"https://www.googleapis.com/books/v1/volumes?q=isbn:{isbn}"
+    response = requests.get(url)
+
+    if response.status_code != 200:
+        print(f"Error: Failed to fetch data (status {response.status_code})")
+        return None
+
+    data = response.json()
+    print(data)
+    if not data.get("items"):
+        print("No book found with this ISBN.")
+        with open("sample_product.json", "r") as f:
+            data = json.load(f)
+
+    print(data)
+
+    volume_info = data["items"][0]["volumeInfo"]
+
+    # Extract clean, minimal fields
+    result = {
+        "title": volume_info.get("title"),
+        "authors": volume_info.get("authors", []),
+        "publishedDate": volume_info.get("publishedDate"),
+        "isbn_13": None,
+        "thumbnail": volume_info.get("imageLinks", {}).get("thumbnail"),
+    }
+
+    # Extract ISBN-13
+    for identifier in volume_info.get("industryIdentifiers", []):
+        if identifier["type"] == "ISBN_13":
+            result["isbn_13"] = identifier["identifier"]
+
+    return result
+
+
 def get_llm_response(query: str, task: str, base64_image: Optional[str] = None, provider: str = "gemini"):
     llm = get_llm(provider)
     prompt = get_task_prompt(task)
 
-    if base64_image:
+    if task == "product_recognition" and base64_image:
+        barcodes = extract_barcode_from_base64(base64_image)[0]
+        print(barcodes)
+        if barcodes:
+            book_info = fetch_book_main_info(barcodes[0])
+            query = "Reformat the following product infomation: " "\n".join(f"{key}: {value}" for key, value in book_info.items())
+            print(book_info)
+        else:
+            query = "No barcode detected."
+        
+
+    if task != "product_recognition" and base64_image:
         image_url = f"data:image/jpeg;base64,{base64_image}"
         messages = [
             {"role": "system", "content": prompt},

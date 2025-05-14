@@ -1,0 +1,80 @@
+{
+    "kind": "books#volumes",
+    "totalItems": 1,
+    "items": [
+        {
+            "kind": "books#volume",
+            "id": "A7kaMQAACAAJ",
+            "etag": "mF58yKPydAE",
+            "selfLink": "https://www.googleapis.com/books/v1/volumes/A7kaMQAACAAJ",
+            "volumeInfo": {
+                "title": "The General Theory of Employment, Interest and Money",
+                "subtitle": "The Economic Consequences of the Peace",
+                "authors": [
+                    "John Maynard Keynes"
+                ],
+                "publisher": "Classics of World Literature",
+                "publishedDate": "2017",
+                "description": "John Maynard Keynes is perhaps the foremost economic thinker of the 20th century. He ranks with Adam Smith and Karl Marx; and his impact on how economics was practiced, from the Great Depression to the 1970s, was unmatched.",
+                "industryIdentifiers": [
+                    {
+                        "type": "ISBN_10",
+                        "identifier": "1840227478"
+                    },
+                    {
+                        "type": "ISBN_13",
+                        "identifier": "9781840227475"
+                    }
+                ],
+                "readingModes": {
+                    "text": false,
+                    "image": false
+                },
+                "pageCount": 0,
+                "printType": "BOOK",
+                "categories": [
+                    "Business & Economics"
+                ],
+                "maturityRating": "NOT_MATURE",
+                "allowAnonLogging": false,
+                "contentVersion": "preview-1.0.0",
+                "panelizationSummary": {
+                    "containsEpubBubbles": false,
+                    "containsImageBubbles": false
+                },
+                "imageLinks": {
+                    "smallThumbnail": "http://books.google.com/books/content?id=A7kaMQAACAAJ&printsec=frontcover&img=1&zoom=5&source=gbs_api",
+                    "thumbnail": "http://books.google.com/books/content?id=A7kaMQAACAAJ&printsec=frontcover&img=1&zoom=1&source=gbs_api"
+                },
+                "language": "en",
+                "previewLink": "http://books.google.com.vn/books?id=A7kaMQAACAAJ&dq=isbn:9781840227475&hl=&cd=1&source=gbs_api",
+                "infoLink": "http://books.google.com.vn/books?id=A7kaMQAACAAJ&dq=isbn:9781840227475&hl=&source=gbs_api",
+                "canonicalVolumeLink": "https://books.google.com/books/about/The_General_Theory_of_Employment_Interes.html?hl=&id=A7kaMQAACAAJ"
+            },
+            "saleInfo": {
+                "country": "VN",
+                "saleability": "NOT_FOR_SALE",
+                "isEbook": false
+            },
+            "accessInfo": {
+                "country": "VN",
+                "viewability": "NO_PAGES",
+                "embeddable": false,
+                "publicDomain": false,
+                "textToSpeechPermission": "ALLOWED",
+                "epub": {
+                    "isAvailable": false
+                },
+                "pdf": {
+                    "isAvailable": false
+                },
+                "webReaderLink": "http://play.google.com/books/reader?id=A7kaMQAACAAJ&hl=&source=gbs_api",
+                "accessViewStatus": "NONE",
+                "quoteSharingAllowed": false
+            },
+            "searchInfo": {
+                "textSnippet": "John Maynard Keynes is perhaps the foremost economic thinker of the 20th century. He ranks with Adam Smith and Karl Marx; and his impact on how economics was practiced, from the Great Depression to the 1970s, was unmatched."
+            }
+        }
+    ]
+}
