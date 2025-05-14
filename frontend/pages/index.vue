@@ -49,8 +49,8 @@
     </div>
 
     <!-- Spotify Mini Player -->
-    <SpotifyMiniPlayer v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
-      @open-spotify-feature="openSpotifyFeature" />
+    <!-- <SpotifyMiniPlayer v-if="spotifyStore.currentTrack && selectedFeature === 'Music'"
+      @open-spotify-feature="openSpotifyFeature" /> -->
 
     <!-- Modals -->
     <SettingsModal :show="isSettingsModalOpen" @close="isSettingsModalOpen = false" />

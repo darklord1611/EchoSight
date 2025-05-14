@@ -30,6 +30,7 @@ const buttons = [
   { name: 'Text', icon: 'fa-solid fa-quote-right' },
   { name: 'Currency', icon: 'fa-solid fa-dollar-sign' },
   { name: 'Object', icon: 'fa-solid fa-cube' },
+  { name: 'Product', icon: 'fa-solid fa-box' },
   { name: 'Distance', icon: 'fa-solid fa-ruler' },
   { name: 'Music', icon: 'fa-solid fa-music' },
   { name: 'Chatbot', icon: 'fa-solid fa-comments' },

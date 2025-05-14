@@ -63,7 +63,7 @@ let intervalId: ReturnType<typeof setInterval>;
 
 // Constants
 const DECIBEL_THRESHOLD = 10;
-const SPEECH_MIN_DURATION = 1000;
+const SPEECH_MIN_DURATION = 500;
 const FEEDBACK_DURATION = 5000; // How long feedback messages stay visible (ms)
 let speechDetected = false;
 let speechStartTime: number | null = null;
